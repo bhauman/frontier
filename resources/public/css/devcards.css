@@ -1,0 +1,43 @@
+.test-body {
+    padding-left: 1em;
+}
+
+.test-body .operator {
+    font-weight: bold;
+    color: black;
+    width: 1.5em;
+    display: inline-block;
+}
+
+.test-body .exp {
+    color: #666;
+    padding-left: 1em;
+}
+
+.devcard-panel {
+    border: none;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+}
+
+.devcard-panel > .panel-heading {
+  background-color: #fff;
+  border-top: solid 1px #f1f1f1;
+  border-bottom: solid 1px #f1f1f1;
+ 
+}  
+
+.test-group > .list-group-item {
+  border: none;
+  border-top: solid 1px #fafafa;  
+}
+
+.list-group.test-group > .list-group-item:first-child,
+.list-group.test-group > .list-group-item:last-child {
+  border-radius: 0px;
+}
+
+.list-group.test-group .list-group-item {
+  
+  
+}
