@@ -5,9 +5,11 @@
     :refer [react-card sab-card test-card edn-card]]
    [crate.core :as c]
    [sablono.core :as sab :include-macros true]
-   [frontier.core :refer [compose]]
+   [frontier.core :refer [compose make-renderable
+                          iTransform iRenderable -transform -render]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
    [frontier.cards :as cards :refer [managed-system-card input-controls-renderer]]
+   [cljs.core.async :refer [chan]]
    )
   (:require-macros
    [devcards.cards :refer [is are= are-not=]]
@@ -15,14 +17,21 @@
 
 (devcards.core/start-file-reloader!)
 
-(def counting-todos-app (compose
-                         (ExampleCounter.)
-                         (ExampleTodos.)))
+(def todo-counter-app (make-renderable
+                         (compose
+                          (ExampleCounter.)
+                          (ExampleTodos.))
+                         (input-controls-renderer [[:inc]
+                                                   [:dec]
+                                                   [:create-todo {:content "do something"}]])))
 
 (defcard managed-ex
   (managed-system-card {}
-                       counting-todos-app
-                       (input-controls-renderer [[:inc] [:dec]])
+                       todo-counter-app
+                       (input-controls-renderer [[:inc]
+                                                 [:dec]
+                                                 [:create-todo {:content "do something else"}]
+                                                 ])
                        [[:inc] [:inc]]))
 
 (defcard fortunate
@@ -39,8 +48,11 @@
 (defcard sab-card-ex
   (sab-card [:div [:h4 "another test is here and is working"]]))
 
+(defn my-func [r]
+  {:johhny 36 :marco 95 :fun "never enough" :r r})
+
 (defcard edn-card-ex 
-  (edn-card {:johhny 34 :marco 95 :fun "never enough"}))
+  (edn-card (my-func 6)))
 
 (defcard test-card-ex
   (test-card

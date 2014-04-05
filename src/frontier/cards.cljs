@@ -10,6 +10,8 @@
                           iTransform
                           iEffect
                           iDerive
+                          iRenderable
+                          -render
                           -derive
                           trans-helper*
                           run
@@ -95,6 +97,9 @@
   (assoc state :messages
          (take 20 (reverse (map-indexed (fn [i x] [(inc i) x]) (:history state))))))
 
+(declare managed-system-render)
+
+
 (defrecord HistoryManager [managed-system]
   iTransform
   (-transform [o msg system]
@@ -110,21 +115,17 @@
         can-go-forward
         can-go-back
         add-msg
-        messages)))
+        messages))
+  iRenderable
+  (-render [o state]
+    (managed-system-render state (fn [state]
+                                   (-render managed-system state)))))
 
-(defrecord SystemSetter []
-  iTransform
-  (-transform [o [msg data] system]
-    (if (= msg :__system.set-state) data system)))
-
-(defn managed-system [initial-state comp state-callback initial-inputs]
+(defn managed-system [initial-state sys-comp state-callback initial-inputs]
   (let [managed-state (atom {})
         watch (add-watch managed-state :renderer
                          (fn [_ _ _ cs]
                            (state-callback cs)))
-        sys-comp (compose
-                  (SystemSetter.)
-                  comp)
         sys (devrunner
              initial-state
              sys-comp
@@ -212,21 +213,22 @@
     ]
    ))
 
+(defn managed-system-render [{:keys [sys-state sys-chan hist-state hist-chan]}
+                             render-func]
+  (let [state (or (:render-state hist-state) sys-state)]
+    [:div
+     (render-history-controls hist-state hist-chan)
+     (render-func { :state state
+                    :event-chan sys-chan }
+                    :disabled (and (:render-state hist-state) true))
+     (html-edn state)]))
+
 (defn managed-renderer [target-node render-func]
-  (fn [{:keys [sys-state sys-chan hist-state hist-chan]}]
-    (let [state (or (:render-state hist-state) sys-state)]
-      (render-to (sab/html
-                  [:div
-                   (render-history-controls hist-state hist-chan)
-                   (render-func { :state state
-                                 :event-chan sys-chan }
-                                :disabled (:render-state hist-state))
-                   (html-edn
-                    
-                    (merge state { :fun  5 })
-                    #_(dissoc state :__msg))])
-                   target-node
-                   identity))))
+  (fn [state]
+    (render-to (sab/html
+                (managed-system-render state render-func))
+               target-node
+               identity)))
 
 (defn render-input-message-links [msgs event-chan & {:keys [disabled]}]
   [:ul
@@ -251,3 +253,4 @@
                     component
                     (managed-renderer node render-func)
                     initial-inputs)))
+

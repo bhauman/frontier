@@ -21,6 +21,14 @@
   (put! (:event-chan devcard-system)
         [:register-card {:path path :tags tags :func func}]))
 
+
 (defn start-file-reloader! []
-  (defonce reloading-socket (watch-and-reload)))
+  (defonce reloading-socket
+    (do
+      (.on (js/$ "body") "devserverJsReload"
+           (fn [e]
+             (.log js/console "reload callback happening")
+             (put! (:event-chan devcard-system) [:jsreload])))
+      (watch-and-reload))))
+
 

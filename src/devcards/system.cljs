@@ -22,7 +22,12 @@
 
 (defrecord DevCard [path tags func position data-atom])
 
-(def devcard? (partial instance? DevCard))
+(defn devcard? [d]
+  (and (map? d)
+       (:data-atom d)
+       (:func d)
+       (:path d)
+       (:position d)))
 
 ;; input filters
 (defmulti ifilter first)
@@ -207,4 +212,3 @@
          (data-to-message :add-to-current-path event-chan))
     (.on ($ sel) "click" ".devcards-set-current-path"
          (data-to-message :set-current-path event-chan)))
-

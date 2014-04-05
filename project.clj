@@ -4,8 +4,8 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.5.1"]
-                 [org.clojure/clojurescript "0.0-2138"]
-                 [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+                 [org.clojure/clojurescript "0.0-2202"]
+                 [org.clojure/core.async "0.1.278.0-76b25b-alpha"]
                  [prismatic/schema "0.2.0"]                 
                  [sablono "0.1.5"]
                  [crate "0.2.4"]
@@ -18,7 +18,7 @@
                  [watchtower "0.1.1"]
                  [digest "1.4.3"]]
   
-  :plugins [[lein-cljsbuild "1.0.1"]]
+  :plugins [[lein-cljsbuild "1.0.3"]]
 
   :source-paths ["src" "src/reactor" "src/frontier" "src/devcards"]
 

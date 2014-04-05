@@ -26,6 +26,9 @@
 (defprotocol iDerive
   (-derive [_ state]))
 
+(defprotocol iRenderable
+  (-render [_ state]))
+
 (defn add-effects [state & args]
   (update-in state [:__effects]
              (fn [effects]
@@ -57,6 +60,8 @@
                    (doseq [pl (reverse effects)]
                      (-effect pl msg state event-chan effect-chan)))]
     (reify
+      ICloneable
+      (-clone [o] o)      
       iPluginInit
       (-initialize [_ state event-chan]
         (doseq [pl initializers]
@@ -73,6 +78,12 @@
       iDerive
       (-derive [_ state]
         (ideriv state)))))
+
+(defn make-renderable [component render-function]
+  (specify component
+    iRenderable
+    (-render [_ state]
+      (render-function state))))
 
 (defn trans-helper* [comp* effect-handler state msg]
   (if-let [new-state (-transform comp* msg state)]
@@ -162,3 +173,4 @@
       :effect-chan effect-chan
       :initial-state initial-state
       :component comp* }))
+
