@@ -68,15 +68,16 @@
 (defmethod hist-trans :history.cancel [_ sys {:keys [history]}]
   (assoc sys :pointer (count history)))
 
+;; derivatives
+
 (defn under-control [system history]
   (assoc system :under-control
          (under-control? system history)))
 
 (defn render-state [system history comp*]
-  (if (under-control?  system history)
-    (assoc system :render-stater
-           (current-state* history (:pointer system) comp*))
-    (assoc system :render-stater
+  (assoc system :render-stater
+         (if (under-control?  system history)
+           (current-state* history (:pointer system) comp*)
            (current-state* history comp*))))
 
 (defn can-go-forward [state history]
@@ -138,10 +139,7 @@
        (html-edn derived-state)])))
 
 (defn managed-system [initial-state sys-comp render-callback initial-inputs]
-  (let [sys (devrunner-new
-             initial-state
-             sys-comp
-             (fn [{:keys [state event-chan]}]))
+  (let [sys (devrunner-new initial-state sys-comp)
         history-manager (HistoryManager. sys)
         history (run {}
                      history-manager
@@ -151,8 +149,7 @@
                                                    :event-chan event-chan }))))]
     (when initial-inputs
       (doseq [msg initial-inputs]
-        (swap! (:state-atom sys) conj msg))
-      (print @(:state-atom sys)))
+        (swap! (:state-atom sys) conj msg)))
     sys))
 
 (defn render-history-controls [{:keys [under-control can-go-back can-go-forward msg messages] :as sys} hist-chan]
