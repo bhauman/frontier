@@ -49,6 +49,17 @@
 (defn set-state [owner new-state-map]
   (.setState owner (clj->js new-state-map)))
 
+(defn set-state-val [owner state-key value]
+  (if-let [state (.-state owner)]
+    (set-state owner
+     (clj->js
+      (assoc (js->clj state)
+        state-key
+        value)))))
+
+(defn get-state [owner]
+  (.-state owner))
+
 (defn get-state-val [owner state-key]
   (if-let [state (.-state owner)]
     (aget state (name state-key))))
@@ -56,6 +67,10 @@
 (defn get-prop-val [owner prop-key]
   (if-let [state (.-props owner)]
     (aget state (name prop-key))))
+
+(defn set-prop-val [owner prop-key value]
+  (if-let [props (.-props owner)]
+    (aset props (name prop-key) value)))
 
 (defn get-children [owner]
   (.. owner -props -children))
