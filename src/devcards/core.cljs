@@ -21,7 +21,6 @@
   (put! (:event-chan devcard-system)
         [:register-card {:path path :tags tags :func func}]))
 
-
 (defn start-file-reloader! []
   (defonce reloading-socket
     (do

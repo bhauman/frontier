@@ -20,11 +20,11 @@
   
   :plugins [[lein-cljsbuild "1.0.3"]]
 
-  :source-paths ["src" "src/reactor" "src/frontier" "src/devcards"]
+  :source-paths ["src" "src/reactor" "src/frontier" "src/devcards" ]
 
   :cljsbuild {
               :builds [{:id "examples"
-                        :source-paths ["src/examples" "src/reactor" "src/frontier" "src/devcards"]
+                        :source-paths ["src/examples" "src/reactor" "src/frontier" "src/devcards" "src/devserver"]
                         :compiler {:output-to "resources/public/js/compiled/examples.js"
                                    :output-dir "resources/public/js/compiled/out"
                                    :externs ["resources/public/js/externs/jquery-1.9.js"]

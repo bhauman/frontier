@@ -45,8 +45,13 @@
   (.log js/console "opening cljs reload socket")
   (let [socket (js/WebSocket. "ws:localhost:8080/ws")]
     (set! (.-onmessage socket) (fn [msg-str]
+                                 #_(log msg-str)
                                  #_(.log js/console msg-str)
                                  #_(.log js/console (read-string (.-data msg-str)))
                                  (let [msg (read-string (.-data msg-str))]
-                                     (js-reload (:file msg)))))))
+                                   (when (= (:msg-name msg) :file-changed)
+                                     (js-reload (:file msg))))))
+    (set! (.-onclose socket) (fn [x] "SOCKET CLOSED"))
+    (set! (.-onerror socket) (fn [x] "SOCKET ERROR"))))
+
 

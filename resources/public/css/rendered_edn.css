@@ -19,7 +19,7 @@
 
 .rendered-edn .collection.map {
     padding: 1.8em;
-    display: block;
+    display: block; 
     vertical-align: top;
 }
 
@@ -57,8 +57,6 @@
 .rendered-edn .closer {
    color: #999;  
 }
-
-
 
 .rendered-edn .collection.map > .opener,
 .rendered-edn .collection.vector > .opener,

@@ -4,11 +4,21 @@
 
 (declare html)
 
+(defn literal? [x]
+  (and (not (seq? x))
+       (not (coll? x))))
+
+(defn smart-seperate [s coll]
+  (if (every? literal? coll)
+    [:span.separator s]
+    [:span [:span.separator s]
+     [:span.clearfix]]))
+
 (defn literal [class x]
   [:span {:className class} (prn-str x)])
 
 (defn join-html [separator coll]
-  (interpose [:span.separator separator]
+  (interpose (smart-seperate separator coll)
              (map html coll)))
 
 (defn html-collection [class opener closer coll]
@@ -24,7 +34,7 @@
    (html v)])
 
 (defn html-keyvals [coll]
-  (interpose [:span.separator ", "]
+  (interpose (smart-seperate " " (vals coll))
              (map html-keyval coll)))
 
 (defn html-map [coll]

@@ -16,9 +16,11 @@
                           -render
                           -derive
                           trans-helper*
+                          runner-stop
                           run
+                          run-with-atom
                           devrunner
-                          devrunner-new
+                          devrunner-with-atom                          
                           add-effects
                           compose]]
    [jayq.util :refer [log]]))
@@ -101,11 +103,15 @@
   iPluginInit
   (-initialize [_ state event-chan]
     (add-watch (:state-atom managed-system) :managed-system-change
-               (fn [_ _ _ n]
-                 (put! event-chan [:history.collect {:new-history n}]))))
+               (fn [_ _ o n]
+                 (if (or (zero? (count o))
+                         (not= (count o) (count n)))
+                   (put! event-chan [:history.collect {:new-history n}])))))
   iPluginStop
   (-stop [_]
-    (remove-watch (:state-atom managed-system) :managed-system-change)
+    (if (:state-atom managed-system)
+      (remove-watch (:state-atom managed-system)
+                    :managed-system-change))
     (-stop managed-system))
   iInputFilter
   (-filter-input [_ msg state] msg)  
@@ -121,13 +127,14 @@
       (reset! (:state-atom managed-system) data)))
   iDerive
   (-derive [o system]
-    (-> system
-        (under-control @(:state-atom managed-system)) 
-        (can-go-forward @(:state-atom managed-system)) 
-        can-go-back
-        (add-msg @(:state-atom managed-system))
-        (messages @(:state-atom managed-system))
-        (render-state @(:state-atom managed-system) managed-system)))
+    (let [history @(:state-atom managed-system)]
+      (-> system
+          (under-control history) 
+          (can-go-forward history) 
+          can-go-back
+          (add-msg history)
+          (messages history)
+          (render-state history managed-system))))
   iRenderable
   (-render [_ {:keys [state event-chan] :as hist-state}]
     (let [derived-state (:render-stater state)]
@@ -139,18 +146,41 @@
        (html-edn derived-state)])))
 
 (defn managed-system [initial-state sys-comp render-callback initial-inputs]
-  (let [sys (devrunner-new initial-state sys-comp)
+  (let [sys (devrunner initial-state sys-comp nil)
         history-manager (HistoryManager. sys)
         history (run {}
                      history-manager
                      (fn [{:keys [state event-chan]}]
                        (render-callback
                         (-render history-manager { :state state
-                                                   :event-chan event-chan }))))]
-    (when initial-inputs
+                                                  :event-chan event-chan }))))]
+    (when (and (zero? (count @(:state-atom sys)))
+               initial-inputs)
       (doseq [msg initial-inputs]
         (swap! (:state-atom sys) conj msg)))
     sys))
+
+(defn managed-system-with-atoms [state-atom
+                                 history-manager-state-atom
+                                 initial-state sys-comp render-callback initial-inputs]
+  (let [sys (devrunner-with-atom state-atom initial-state sys-comp nil)
+        history-manager (HistoryManager. sys)
+        render-fn (fn [{:keys [state event-chan]}]
+                    (render-callback
+                     (-render history-manager { :state state
+                                                :event-chan event-chan })))
+        history (run-with-atom
+                 history-manager-state-atom
+                 {}
+                 history-manager
+                 render-fn)]
+    (if (and (zero? (count @(:state-atom sys)))
+             initial-inputs)
+      (doseq [msg initial-inputs]
+        (swap! (:state-atom sys) conj msg))
+      (put! (:event-chan history) [:history.render-no-op]))
+    { :system-manager history
+      :system sys }))
 
 (defn render-history-controls [{:keys [under-control can-go-back can-go-forward msg messages] :as sys} hist-chan]
   (sab/html
@@ -225,14 +255,22 @@
   (fn [{:keys [event-chan]} & {:keys [disabled]}]
     (render-input-message-links
      input-messages
-     event-chan
-     :disabled disabled)))
+     event-chan)))
 
-(defn managed-system-card [initial-state component render-func initial-inputs]
+(defn managed-system-card [initial-state component-fn initial-inputs]
   (fn [{:keys [node data]}]
-    (managed-system initial-state
-                    component
-                    (fn [react-dom]
-                      (when react-dom
-                        (render-to (sab/html react-dom) node identity)))
-                    initial-inputs)))
+    (if-let [s (get-in @data [:system :running])]
+      (runner-stop (:system @data)))
+    (if-let [s (get-in @data [:system-manager :running])]
+      (runner-stop (:system-manager @data)))
+    (let [new-ms (managed-system-with-atoms
+                  (or (get-in @data [:system :state-atom]) (atom []))
+                  (or (get-in @data [:system-manager :state-atom]) (atom {}))
+                  initial-state
+                  (component-fn) 
+                  (fn [react-dom]
+                    (when react-dom
+                      (render-to (sab/html react-dom) node identity)))
+                  initial-inputs)]
+      (reset! data new-ms))))
+

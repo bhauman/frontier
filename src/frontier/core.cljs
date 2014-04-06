@@ -32,10 +32,6 @@
 (defprotocol iRenderable
   (-render [_ state]))
 
-(defprotocol Lifecycle
-  (start [o])
-  (stop [o]))
-
 (defn add-effects [state & args]
   (update-in state [:__effects]
              (fn [effects]
@@ -131,7 +127,6 @@
                                   state))
   IMessageTransform
   (message-transform [r state msg]
-    ;; only for side effects
     (trans-helper* (:component r)
                    #(doseq [ef %]
                       (put! (:effect-chan r) ef))
@@ -151,17 +146,20 @@
   r)
 
 (defn listen-for-effects [{:keys [component state-atom event-chan effect-chan] :as r}]
-  (let [effect-chan (or effect-chan (chan))]
+  (let [effect-chan (or effect-chan (chan))
+        event-chan (or event-chan (chan))]
     (dev-null
      (map< (fn [msg]
              (-effect component msg
                       (state-process r @state-atom)
-                      event-chan effect-chan) true)
+                      event-chan
+                      effect-chan) true)
            effect-chan))
     (assoc r :effect-chan effect-chan)))
 
 (defn listen-for-messages [{:keys [component state-atom event-chan effect-chan] :as r}]
-  (let [event-chan (or event-chan (chan))]
+  (let [event-chan (or event-chan (chan))
+        effect-chan (or effect-chan (chan))]
     (dev-null
      (map< (fn [msg]
            (let [new-msg (-filter-input component msg @state-atom)]
@@ -197,9 +195,12 @@
       (assoc :running true)))
 
 (defn runner-stop [runnable]
-  (remove-watch (:state-atom runnable) :state-callback)
-  (close! (:event-chan runnable))
-  (close! (:effect-chan runnable))
+  (when (:state-atom runnable)
+    (remove-watch (:state-atom runnable) :state-callback))
+  (when (:event-chan runnable)
+    (close! (:event-chan runnable)))
+  (when (:effect-chan runnable)
+    (close! (:effect-chan runnable)))
   (-> runnable
       (assoc :event-chan nil)
       (assoc :effect-chan nil)
@@ -207,6 +208,12 @@
 
 (defn run [initial-state component state-callback]
   (-> (make-runnable component initial-state)
+      (assoc :state-callback state-callback)
+      runner-start))
+
+(defn run-with-atom [state-atom initial-state component state-callback]
+  (-> (make-runnable component initial-state)
+      (assoc :state-atom state-atom)
       (assoc :state-callback state-callback)
       runner-start))
 
@@ -219,9 +226,15 @@
       initialize
       (assoc :running true)))
 
-(defn devrunner-new [initial-state component state-callback]
+(defn devrunner [initial-state component state-callback]
   (-> (make-runnable component initial-state)
       (assoc :state-atom (atom []))
+      (assoc :state-callback state-callback)
+      devrunner-start))
+
+(defn devrunner-with-atom [state-atom initial-state component state-callback]
+  (-> (make-runnable component initial-state)
+      (assoc :state-atom state-atom)
       (assoc :state-callback state-callback)
       devrunner-start))
 
@@ -233,3 +246,4 @@
     (doseq [msg initial-inputs]
       (swap! (:state system) (partial message-transform system) msg))
     system))
+

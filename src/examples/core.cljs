@@ -8,7 +8,10 @@
    [frontier.core :refer [compose make-renderable
                           iTransform iRenderable -transform -render]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
-   [frontier.cards :as cards :refer [managed-system-card input-controls-renderer]]
+   [frontier.cards :as cards :refer [managed-system-card
+                                     input-controls-renderer
+                                     managed-system]]
+   [reactor.core :refer [render-to]]
    [cljs.core.async :refer [chan]]
    )
   (:require-macros
@@ -17,22 +20,43 @@
 
 (devcards.core/start-file-reloader!)
 
-(def todo-counter-app (make-renderable
-                         (compose
-                          (ExampleCounter.)
-                          (ExampleTodos.))
-                         (input-controls-renderer [[:inc]
-                                                   [:dec]
-                                                   [:create-todo {:content "do something"}]])))
+(defn todo-counter-app [] (make-renderable
+                           (compose
+                            (ExampleCounter.)
+                            (ExampleTodos.))
+                           (input-controls-renderer [[:inc]
+                                                     [:dec]
+                                                     [:decccddd]
+                                                     [:create-todo {:content "do something"}]])))
+
 
 (defcard managed-ex
   (managed-system-card {}
                        todo-counter-app
-                       (input-controls-renderer [[:inc]
-                                                 [:dec]
-                                                 [:create-todo {:content "do something else"}]
-                                                 ])
                        [[:inc] [:inc]]))
+
+#_(defcard edn-card-ex 
+  (edn-card { :count 2
+
+             :stuff #{               {:content "do omething" :id 5284589 }
+              {:content "do something" :id 6449664 }
+              {:content "do something" :id 4739498 }
+              {:content "do something" :id 4486982 }}
+             :todos
+
+             [
+              {:content "do omething" :id 5284589 }
+              {:content "do something" :id 6449664 }
+              {:content "do something" :id 4739498 }
+              {:content "do something" :id 4486982 }
+              {:content "do something" :id 9475352 }
+              {:content "do something" :id 2498755 }
+              {:content "do something" :id 47767 }
+              {:content "do something" :id 3415408 }
+              {:content "do something" :id 9156329 }
+              ] :double 4}))
+
+(comment
 
 (defcard fortunate
          (fn [{:keys [node]}]
@@ -51,8 +75,7 @@
 (defn my-func [r]
   {:johhny 36 :marco 95 :fun "never enough" :r r})
 
-(defcard edn-card-ex 
-  (edn-card (my-func 6)))
+
 
 (defcard test-card-ex
   (test-card
@@ -62,7 +85,8 @@
    (are= 5 5)
    (are-not= 5 5)
    (are-not= 5 5)
-   (are-not= 5 5)))
+   (are-not= 5 6))))
+
 
 (defn log [d]
   (.log js/console d))
