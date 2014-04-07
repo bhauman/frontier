@@ -22,20 +22,25 @@
    [devcards.cards :refer [is are= are-not=]]
    [devcards.macros :refer [defonce]]))
 
+(devcards.core/start-devcard-ui!)
+
+#_(devcards.core/start-single-card-ui!)
+
 (devcards.core/start-file-reloader!)
 
-(defn todo-counter-app [] (make-renderable
-                           (compose
-                            (ExampleCounter.)
-                            (ExampleTodos.))
-                           (fn [{:keys [state event-chan] :as rstate}]
-                             [:div
-                              ((input-controls-renderer [[:inc]
-                                                        [:dec]
-                                                        [:deccce]
-                                                        [:create-todo {:content "do something"}]])
-                               rstate)
-                              #_(html-edn state)])))
+(defn todo-counter-app []
+  (make-renderable
+   (compose
+    (ExampleCounter.)
+    (ExampleTodos.))
+   (fn [{:keys [state event-chan] :as rstate}]
+     [:div
+      ((input-controls-renderer [[:inc]
+                                 [:dec]
+                                 [:decce]
+                                 [:create-todo {:content "do something"}]])
+       rstate)
+      #_(html-edn state)])))
 
 (defcard managed-ex
   (managed-system-card {}
@@ -96,23 +101,20 @@
  (.getElementById js/document "main-area") identity)
 
 
-
-
-(comment
-
 (defcard fortunate
          (fn [{:keys [node]}]
-           (.html (js/$ node) (c/html [:h3 "Hello 49ers if you like it that way "]))))
+           (.html (js/$ node) (c/html [:h3 "Hello 49ers are you there"]))))
 
 (defcard edn-card-ex 
-  (edn-card { :count 2
+  (edn-card { :count 134
 
-             :stuff #{               {:content "do omething" :id 5284589 }
-              {:content "do something" :id 6449664 }
-              {:content "do something" :id 4739498 }
-              {:content "do something" :id 4486982 }}
+             :stuff #{
+                      {:content "do something" :id 5284589 }
+                      {:content "do something" :id 6449664 }
+                      {:content "do something" :id 4739498 }
+                      {:content "do something" :id 4486982 }}
              :todos
-
+             
              [
               {:content "do omething" :id 5284589 }
               {:content "do something" :id 6449664 }
@@ -124,6 +126,12 @@
               {:content "do something" :id 3415408 }
               {:content "do something" :id 9156329 }
               ] :double 4}))
+
+#_(devcards.core/render-single-card
+   [:examples.core :edn-card-ex]
+   (.getElementById js/document "main-area"))
+
+(comment
 
 (defcard fortunater
   (fn [{:keys [node data position]}]
@@ -137,8 +145,6 @@
 
 (defn my-func [r]
   {:johhny 36 :marco 95 :fun "never enough" :r r})
-
-
 
 (defcard test-card-ex
   (test-card

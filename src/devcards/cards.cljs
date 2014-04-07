@@ -2,11 +2,15 @@
   (:require
    [reactor.core :refer [render-to]]
    [sablono.core :as sab :include-macros true]
+   [devcards.system :refer [IMountable]]
    [frontier.util.edn-renderer :refer [html-edn]]))
 
 (defn react-card [react-component]
-  (fn [{:keys [node]}]
-    (render-to react-component node identity)))
+  (reify IMountable
+    (mount [_ {:keys [node]}]
+      (render-to react-component node identity))
+    (unmount [_ {:keys [node]}]
+      (.unmountComponentAtNode js/React node))))
 
 (defn sab-card [sab-template]
   (react-card (sab/html sab-template)))

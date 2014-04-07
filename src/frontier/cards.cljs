@@ -5,6 +5,7 @@
    [reactor.core :refer [render-to raw]]
    [sablono.core :as sab :include-macros true]
    [frontier.util.edn-renderer :refer [html-edn]]
+   [devcards.system :refer [IMountable]]
    [frontier.core :refer [iInputFilter
                           iPluginInit
                           iTransform
@@ -258,20 +259,22 @@
      event-chan)))
 
 (defn managed-system-card [initial-state component initial-inputs]
-  (fn [{:keys [node data]}]
-    (print "we are here")
-    (if-let [s (get-in @data [:system :running])]
-      (runner-stop (:system @data)))
-    (if-let [s (get-in @data [:system-manager :running])]
-      (runner-stop (:system-manager @data)))
-    (let [new-ms (managed-system-with-atoms
-                  (or (get-in @data [:system :state-atom]) (atom []))
-                  (or (get-in @data [:system-manager :state-atom]) (atom {}))
-                  initial-state
-                  component
-                  (fn [react-dom]
-                    (when react-dom
-                      (render-to (sab/html react-dom) node identity)))
-                  initial-inputs)]
-      (reset! data new-ms))))
-
+  (reify
+    IMountable
+    (mount [_ {:keys [node data]}]
+      (let [new-ms (managed-system-with-atoms
+                    (or (get-in @data [:system :state-atom]) (atom []))
+                    (or (get-in @data [:system-manager :state-atom]) (atom {}))
+                    initial-state
+                    component
+                    (fn [react-dom]
+                      (when react-dom
+                        (render-to (sab/html react-dom) node identity)))
+                    initial-inputs)]
+        (reset! data new-ms)))
+    (unmount [_ {:keys [node data]}]
+      (when (get-in @data [:system :running])
+        (swap! data assoc :system (runner-stop (:system @data))) )
+      (when (get-in @data [:system-manager :running])
+        (swap! data assoc :system-manger (runner-stop (:system-manager @data))))
+      (.unmountComponentAtNode js/React node))))

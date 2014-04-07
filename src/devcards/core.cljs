@@ -1,33 +1,49 @@
 (ns devcards.core
   (:require
-   [frontier.core :refer [run]]
-   [devcards.system :refer [devcard-start
-                            devcard-comp
+   [frontier.core :refer [run
+                          make-runnable
+                          runner-start]]
+   [devcards.system :refer [devcard-system-start
                             devcard-renderer
-                            register-listeners]]
+                            register-listeners
+                            unmount-card-nodes
+                            mount-card-nodes
+                            unique-card-id]]
    [devserver.reloader :refer [watch-and-reload]]   
-   [cljs.core.async :refer [put!]])
+   [cljs.core.async :refer [put! chan]])
   (:require-macros
    [devcards.macros :refer [defonce]]))
 
-(defonce devcard-system
-      (run devcard-start
-           devcard-comp
-           devcard-renderer))
+;; oh well
+(defonce devcard-event-chan (chan))
 
-(defonce listeners (register-listeners "#devcards" (:event-chan devcard-system)))
+(defn start-devcard-ui! []
+  (defonce devcard-system
+    (let [ds (devcard-system-start devcard-event-chan devcard-renderer)]
+      (register-listeners "#devcards" devcard-event-chan)
+      ds)))
 
-(defn register-card [path tags func]
-  (put! (:event-chan devcard-system)
-        [:register-card {:path path :tags tags :func func}]))
+(defn start-single-card-ui! []
+  (defonce devcard-system
+    (devcard-system-start devcard-event-chan
+                          (fn [{:keys [state event-chan]}]
+                            (unmount-card-nodes state)
+                            (mount-card-nodes state)))))
 
 (defn start-file-reloader! []
   (defonce reloading-socket
     (do
       (.on (js/$ "body") "devserverJsReload"
            (fn [e]
-             (.log js/console "reload callback happening")
-             (put! (:event-chan devcard-system) [:jsreload])))
+             #_(.log js/console "reload callback happening")
+             (put! devcard-event-chan [:jsreload])))
       (watch-and-reload))))
 
+(defn register-card [path tags func]
+  (put! devcard-event-chan
+        [:register-card {:path path :tags tags :func func}]))
 
+(defn render-single-card [card-path node]
+  (let [id (unique-card-id card-path)]
+    (when-not (.getElementById js/document id)
+      (.html (js/$ node) (str "<div class='devcard-rendered-card' id='" id "'></div>")))))

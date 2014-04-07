@@ -5,6 +5,8 @@
                           iDerive
                           iInputFilter
                           run
+                          make-runnable
+                          runner-start
                           compose]]
    [jayq.core :refer [$]]
    [crate.core :as c]
@@ -13,12 +15,24 @@
    [cljs.reader :refer [read-string]]))
 
 (defn unique-card-id [path]
-  (string/join "-" (map name (cons :cardpath path))))
+  (string/join "." (map (fn [x] (str "[" x "]"))
+                        (map name (cons :cardpath path)))))
+
+(defn unique-card-id->path [card-id]
+  (mapv keyword
+       (-> (subs card-id 1
+                 (dec (count card-id)))
+           (string/split #"\].\[")
+           rest)))
 
 (defn current-page [data]
   (and (:current-path data)
        (:cards data)
        (get-in (:cards data) (:current-path data))))
+
+(defprotocol IMountable
+  (mount [o data])
+  (unmount [o data]))
 
 (defrecord DevCard [path tags func position data-atom])
 
@@ -170,30 +184,34 @@
 (defn sel-nodes [sel]
   (mapv to-node ($ sel)))
 
-(defn unmount-react-components [state]
-  (let [cards (sel-nodes ".devcard-rendered-card")]
-    (mapv
-     #(.unmountComponentAtNode js/React %)
-     (seq cards))))
+(defn unmount-card-nodes [data]
+  (let [card-nodes (sel-nodes ".devcard-rendered-card")]
+    (doseq [node card-nodes]
+      (when-let [card  (get-in data (cons :cards (unique-card-id->path (.-id node))))]
+        (let [functionality ((:func card))]
+          (when (satisfies? IMountable functionality)
+            (unmount functionality { :node node
+                                     :data (:data-atom card)})))))))
+
+(defn mount-card-nodes [data]
+  (let [card-nodes (sel-nodes ".devcard-rendered-card")]
+    (doseq [node card-nodes]
+      (when-let [card (get-in data (cons :cards (unique-card-id->path (.-id node))))]
+        (let [functionality ((:func card))
+             arg { :node node
+                   :data (:data-atom card) }]
+         (if (satisfies? IMountable functionality)
+           (mount functionality arg)
+           (apply functionality [arg])))))))
 
 (defn devcard-renderer [{:keys [state event-chan]}]
-  (unmount-react-components state)
+  (unmount-card-nodes state)
   (.html ($ "#devcards") (c/html (main-template state)))
-  (let [some-cards (map second (:display-cards state))
-        cards (if-let [card (:display-single-card state)]
-                (cons card some-cards)
-                some-cards)]
-    (mapv
-     (fn [{:keys [func path data-atom position]}]
-       ;; strange bug?  need to call apply here?
-       (apply (func) [{ :node (.getElementById js/document (unique-card-id path))
-                        :position position
-                        :data data-atom }]))
-     cards)))
+  (mount-card-nodes state))
 
-(def devcard-start { :current-path []
-                     :position 0
-                     :cards {} })
+(def devcard-initial-data { :current-path []
+                            :position 0
+                            :cards {} })
 
 (def devcard-comp (compose
                    (DevCards.)
@@ -213,3 +231,9 @@
          (data-to-message :add-to-current-path event-chan))
     (.on ($ sel) "click" ".devcards-set-current-path"
          (data-to-message :set-current-path event-chan)))
+
+(defn devcard-system-start [event-chan render-callback]
+  (-> (make-runnable devcard-comp devcard-initial-data)
+                 (assoc :state-callback render-callback)
+                 (assoc :event-chan event-chan)
+                 runner-start))
