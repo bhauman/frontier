@@ -32,16 +32,15 @@
                              [:div
                               ((input-controls-renderer [[:inc]
                                                         [:dec]
-                                                        [:decccdd]
+                                                        [:deccce]
                                                         [:create-todo {:content "do something"}]])
                                rstate)
-                              (print "here is some state" state)
-                              (html-edn state)])))
+                              #_(html-edn state)])))
 
-#_(defcard managed-ex
+(defcard managed-ex
   (managed-system-card {}
-                       todo-counter-app
-                       [[:inc] [:inc]]))
+                       (todo-counter-app) 
+                       [[:inc] [:inc] ]))
 
 (def RunnableComponent
   (let [runnable (fn [this]
@@ -80,14 +79,14 @@
                  (sab/html (-render (:component (runnable this))
                                       (aget (.-state this) "runnable-state")))))))))
 
-(defonce state-atom (atom nil))
+#_(defonce state-atom (atom nil))
 
-(defonce running-component (RunnableComponent. (js-obj "runnable"
+#_(defonce running-component (RunnableComponent. (js-obj "runnable"
                                                        (assoc (make-runnable (todo-counter-app) { :hello 1 })
                                                          :state-atom 
                                                          state-atom))))
 
-(render-to
+#_(render-to
  #_running-component
  (sab/html [:h1 "hi"]) 
  #_(RunnableComponent. (js-obj "runnable"

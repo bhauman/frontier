@@ -257,8 +257,9 @@
      input-messages
      event-chan)))
 
-(defn managed-system-card [initial-state component-fn initial-inputs]
+(defn managed-system-card [initial-state component initial-inputs]
   (fn [{:keys [node data]}]
+    (print "we are here")
     (if-let [s (get-in @data [:system :running])]
       (runner-stop (:system @data)))
     (if-let [s (get-in @data [:system-manager :running])]
@@ -267,7 +268,7 @@
                   (or (get-in @data [:system :state-atom]) (atom []))
                   (or (get-in @data [:system-manager :state-atom]) (atom {}))
                   initial-state
-                  (component-fn) 
+                  component
                   (fn [react-dom]
                     (when react-dom
                       (render-to (sab/html react-dom) node identity)))

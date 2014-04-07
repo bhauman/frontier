@@ -185,9 +185,10 @@
                 some-cards)]
     (mapv
      (fn [{:keys [func path data-atom position]}]
-       (func { :node (.getElementById js/document (unique-card-id path))
-               :position position
-               :data data-atom }))
+       ;; strange bug?  need to call apply here?
+       (apply (func) [{ :node (.getElementById js/document (unique-card-id path))
+                        :position position
+                        :data data-atom }]))
      cards)))
 
 (def devcard-start { :current-path []
