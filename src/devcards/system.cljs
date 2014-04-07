@@ -184,6 +184,15 @@
 (defn sel-nodes [sel]
   (mapv to-node ($ sel)))
 
+(defn visible-card-nodes [data]
+  (let [card-nodes (sel-nodes ".devcard-rendered-card")]
+    (filter first
+            (map
+             (juxt
+              #(get-in data (cons :cards (unique-card-id->path (.-id %))))
+              identity)
+             card-nodes))))
+
 (defn unmount-card-nodes [data]
   (let [card-nodes (sel-nodes ".devcard-rendered-card")]
     (doseq [node card-nodes]
@@ -193,7 +202,7 @@
             (unmount functionality { :node node
                                      :data (:data-atom card)})))))))
 
-(defn mount-card-nodes [data]
+(defn mount-card-nodes-old [data]
   (let [card-nodes (sel-nodes ".devcard-rendered-card")]
     (doseq [node card-nodes]
       (when-let [card (get-in data (cons :cards (unique-card-id->path (.-id node))))]
@@ -203,6 +212,15 @@
          (if (satisfies? IMountable functionality)
            (mount functionality arg)
            (apply functionality [arg])))))))
+
+(defn mount-card-nodes [data]
+  (doseq [[card node] (visible-card-nodes data)]
+    (let [functionality ((:func card))
+          arg { :node node
+                :data (:data-atom card)}]
+      (if (satisfies? IMountable functionality)
+        (mount functionality arg)
+        (apply functionality [arg])))))
 
 (defn devcard-renderer [{:keys [state event-chan]}]
   (unmount-card-nodes state)

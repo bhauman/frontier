@@ -37,7 +37,7 @@
      [:div
       ((input-controls-renderer [[:inc]
                                  [:dec]
-                                 [:decce]
+                                 [:deccert]
                                  [:create-todo {:content "do something"}]])
        rstate)
       #_(html-edn state)])))
