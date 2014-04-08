@@ -8,7 +8,8 @@
                             register-listeners
                             unmount-card-nodes
                             mount-card-nodes
-                            unique-card-id]]
+                            unique-card-id
+                            throttle-function]]
    [devserver.reloader :refer [watch-and-reload]]   
    [cljs.core.async :refer [put! chan]])
   (:require-macros
@@ -19,16 +20,19 @@
 
 (defn start-devcard-ui! []
   (defonce devcard-system
-    (let [ds (devcard-system-start devcard-event-chan devcard-renderer)]
+    (let [ds (devcard-system-start devcard-event-chan
+                                   (throttle-function devcard-renderer 50))]
       (register-listeners "#devcards" devcard-event-chan)
       ds)))
 
 (defn start-single-card-ui! []
   (defonce devcard-system
     (devcard-system-start devcard-event-chan
-                          (fn [{:keys [state event-chan]}]
+                          (throttle-function
+                           (fn [{:keys [state event-chan]}]
                             (unmount-card-nodes state)
-                            (mount-card-nodes state)))))
+                            (mount-card-nodes state))
+                           50))))
 
 (defn start-file-reloader! []
   (defonce reloading-socket

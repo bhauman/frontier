@@ -11,8 +11,10 @@
    [jayq.core :refer [$]]
    [crate.core :as c]
    [clojure.string :as string]
-   [cljs.core.async :refer [put!]]
-   [cljs.reader :refer [read-string]]))
+   [cljs.core.async :refer [put! chan sliding-buffer timeout]]
+   [cljs.reader :refer [read-string]])
+  (:require-macros
+   [cljs.core.async.macros :refer [go go-loop]]))
 
 (defn unique-card-id [path]
   (string/join "." (map (fn [x] (str "[" x "]"))
@@ -101,6 +103,7 @@
 (defrecord DevCards []
   iInputFilter
   (-filter-input [o msg state]
+    (print (first msg))
     (ifilter msg state))
   iTransform
   (-transform [o msg state]
@@ -194,13 +197,12 @@
              card-nodes))))
 
 (defn unmount-card-nodes [data]
-  (let [card-nodes (sel-nodes ".devcard-rendered-card")]
-    (doseq [node card-nodes]
-      (when-let [card  (get-in data (cons :cards (unique-card-id->path (.-id node))))]
-        (let [functionality ((:func card))]
+  (doseq [[card node] (visible-card-nodes data)]
+    (when-let [card  (get-in data (cons :cards (unique-card-id->path (.-id node))))]
+      (let [functionality ((:func card))]
           (when (satisfies? IMountable functionality)
             (unmount functionality { :node node
-                                     :data (:data-atom card)})))))))
+                                    :data (:data-atom card)}))))))
 
 (defn mount-card-nodes-old [data]
   (let [card-nodes (sel-nodes ".devcard-rendered-card")]
@@ -226,6 +228,8 @@
   (unmount-card-nodes state)
   (.html ($ "#devcards") (c/html (main-template state)))
   (mount-card-nodes state))
+
+
 
 (def devcard-initial-data { :current-path []
                             :position 0
@@ -255,3 +259,40 @@
                  (assoc :state-callback render-callback)
                  (assoc :event-chan event-chan)
                  runner-start))
+
+(defn throttle-chan [in ms]
+  (let [out (chan)]
+    (go-loop []
+             (let [d (<! in)
+                   timer (timeout ms)]
+               (put! out
+                     (loop [d d]
+                       (let [[val tc] (alts! [in timer])]
+                         (if (= tc timer)
+                           d
+                           (recur val)))))
+               (recur)))
+    out))
+
+(defn throttle-function [f ms]
+  (let [q (chan (sliding-buffer 1))
+        tq (throttle-chan q ms)]
+    (go-loop []
+             (when-let [v (<! tq)]
+               (f v) (recur)))
+    (fn [x] (put! q x))))
+
+#_(defn throttle-renderer [f ms]
+    (let [q (chan (sliding-buffer 1))]
+      (go-loop []
+               (let [d (<! q)
+                     timer (timeout ms)]
+                 (f (loop [d d]
+                      (let [[val c'] (alts! [q timer])]
+                        (if (= c' timer)
+                d
+                (recur val)))))
+                 (recur)))
+      (fn [x] (put! q x))))
+
+
