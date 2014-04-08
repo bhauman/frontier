@@ -3,7 +3,7 @@
    [reactor.core :refer [render-to]]
    [sablono.core :as sab :include-macros true]
    [devcards.system :refer [IMountable]]
-   [frontier.util.edn-renderer :refer [html-edn]]))
+   [devcards.util.edn-renderer :refer [html-edn]]))
 
 (defn react-card [react-component]
   (reify IMountable

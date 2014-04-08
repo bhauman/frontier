@@ -1,4 +1,4 @@
-(ns frontier.util.edn-renderer
+(ns devcards.util.edn-renderer
   (:require
    [sablono.core :as sab :include-macros true]))
 

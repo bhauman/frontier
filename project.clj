@@ -11,7 +11,8 @@
                  [crate "0.2.4"]
                  [jayq "2.4.0"]
                  [org.clojars.franks42/cljs-uuid-utils "0.1.3"]                 
-
+                 [om "0.5.3"]
+                 
                  [ring "1.2.1"] 
                  [http-kit "2.1.16"]
                  [compojure "1.1.6"]
