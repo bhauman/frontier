@@ -2,9 +2,10 @@
   (:require
    [cljs.core.async :as async
     :refer [put!]]
+   [clojure.string :as string]
    [reactor.core :refer [render-to raw]]
    [sablono.core :as sab :include-macros true]
-   [frontier.util.edn-renderer :refer [html-edn]]
+   [devcards.util.edn-renderer :refer [html-edn]]
    [devcards.system :refer [IMountable]]
    [frontier.core :refer [iInputFilter
                           iPluginInit
@@ -13,17 +14,20 @@
                           iDerive
                           iRenderable
                           iPluginStop
+                          HistoryKeeper
                           -stop
                           -render
                           -derive
+                          -effect
+                          -transform
+                          -initialize
+                          -filter-input
                           trans-helper*
                           runner-stop
-                          run
                           run-with-atom
-                          devrunner
-                          devrunner-with-atom                          
                           add-effects
-                          compose]]
+                          compose
+                          move-effects-to-top]]
    [jayq.util :refer [log]]))
 
 (defn can-go-forward? [{:keys [pointer]} history]
@@ -35,25 +39,25 @@
   (not= (:pointer system ) (count history)))
 
 (defn current-state*
-  ([history pointer {:keys [component initial-state]}]
+  ([{:keys [initial-state history] :as virt-state } pointer component]
      (-derive component
-              (if (zero? pointer)
-                initial-state
-                (reduce (partial trans-helper* component identity)
-                        initial-state
-                        (subvec history 0 pointer)))))
-  ([history system]
-     (current-state* history (count history) system)))
+                      (if (zero? pointer)
+                        {:__history-keeper {:state initial-state
+                                     :initial-state initial-state
+                                     :history [] }}
+                        (reduce (partial trans-helper* component identity)
+                                initial-state
+                                (subvec history
+                                        0 pointer)))))
+  ([{:keys [history] :as virt-state} component]
+     (current-state* virt-state (count history) component)))
 
 (defmulti hist-trans first)
 
 (defmethod hist-trans :default [_ system _] system)
 
 (defmethod hist-trans :history.goto [[_ p] sys _]
-  (assoc sys :pointer p))
-
-(defmethod hist-trans :history.collect [[_ data] sys _]
-  (assoc sys :pointer (count (:new-history data))))
+  (assoc-in sys :pointer p))
 
 (defmethod hist-trans :history.back [_ sys _]
   (if (can-go-back? sys)
@@ -66,7 +70,7 @@
     sys))
 
 (defmethod hist-trans :history.keep [_ {:keys [pointer] :as sys} {:keys [history]}]
-  (add-effects sys [:set-state (subvec history 0 pointer)]))
+  (add-effects sys [:history.set-state (subvec history 0 pointer)]))
 
 (defmethod hist-trans :history.cancel [_ sys {:keys [history]}]
   (assoc sys :pointer (count history)))
@@ -77,11 +81,11 @@
   (assoc system :under-control
          (under-control? system history)))
 
-(defn render-state [system history comp*]
-  (assoc system :render-stater
-         (if (under-control?  system history)
-           (current-state* history (:pointer system) comp*)
-           (current-state* history comp*))))
+(defn render-state [hist-state virt-state comp*]
+  (assoc hist-state :render-stater
+         (if (under-control? hist-state (:history virt-state))
+           (current-state* virt-state (:pointer hist-state) comp*)
+           (current-state* virt-state comp*))))
 
 (defn can-go-forward [state history]
   (assoc state :can-go-forward
@@ -100,88 +104,64 @@
 
 (declare render-history-controls)
 
-(defrecord HistoryManager [managed-system]
+(defn history-message? [msg]
+  (-> (first msg)
+      name
+      (string/split #"\.")
+      first
+      (= "history")))
+
+(defrecord HistoryManager [virtual-system]
   iPluginInit
   (-initialize [_ state event-chan]
-    (add-watch (:state-atom managed-system) :managed-system-change
-               (fn [_ _ o n]
-                 (if (or (zero? (count o))
-                         (not= (count o) (count n)))
-                   (put! event-chan [:history.collect {:new-history n}])))))
+    (-initialize virtual-system state event-chan))
   iPluginStop
   (-stop [_]
-    (if (:state-atom managed-system)
-      (remove-watch (:state-atom managed-system)
-                    :managed-system-change))
-    (-stop managed-system))
+    (-stop virtual-system))
   iInputFilter
-  (-filter-input [_ msg state] msg)  
+  (-filter-input [_ msg state]
+    (-filter-input virtual-system msg state))
   iTransform
-  (-transform [o msg system]
-    (let [current-system (assoc
-                             (select-keys managed-system [:component :initial-state])
-                           :history @(:state-atom managed-system))]
-      (hist-trans msg system current-system)))
+  (-transform [o msg state]
+    (if (history-message? msg)
+      (move-effects-to-top
+       [:__history-manager]
+       (update-in state [:__history-manager]
+                  (fn [hist-state]
+                    (hist-trans msg hist-state (:__history-keeper state)))))
+      (let [new-state (-transform virtual-system msg state)]
+        (assoc-in
+         new-state
+         [:__history-manager :pointer]
+         (count (get-in new-state [:__history-keeper :history]))))))
   iEffect
-  (-effect [o [msg data] system event-chan effect-chan]
-    (if (= :set-state msg)
-      (reset! (:state-atom managed-system) data)))
+  (-effect [o msg state event-chan effect-chan]
+    (if (= (first msg) :history.set-state)
+      (put! event-chan [:__history-keeper.set-history (second msg)])
+      (-effect virtual-system msg state event-chan effect-chan)))
+  
   iDerive
-  (-derive [o system]
-    (let [history @(:state-atom managed-system)]
-      (-> system
-          (under-control history) 
-          (can-go-forward history) 
-          can-go-back
-          (add-msg history)
-          (messages history)
-          (render-state history managed-system))))
+  (-derive [o state]
+    (let [history (get-in state [:__history-keeper :history])]
+      (update-in state
+                 [:__history-manager]
+                 (fn [hist-state]
+                   (-> hist-state
+                       (under-control history) 
+                       (can-go-forward history) 
+                       can-go-back
+                       (add-msg history)
+                       (messages history)
+                       (render-state (:__history-keeper state) virtual-system))))))
   iRenderable
   (-render [_ {:keys [state event-chan] :as hist-state}]
-    (let [derived-state (:render-stater state)]
+    (let [derived-state (get-in state [:__history-manager :render-stater])]
       [:div
-       (render-history-controls state event-chan)
-       (-render (:component managed-system)
+       (render-history-controls (:__history-manager state) event-chan)
+       (-render virtual-system
                 { :state derived-state
-                  :event-chan (:event-chan managed-system) })
-       (html-edn derived-state)])))
-
-(defn managed-system [initial-state sys-comp render-callback initial-inputs]
-  (let [sys (devrunner initial-state sys-comp nil)
-        history-manager (HistoryManager. sys)
-        history (run {}
-                     history-manager
-                     (fn [{:keys [state event-chan]}]
-                       (render-callback
-                        (-render history-manager { :state state
-                                                  :event-chan event-chan }))))]
-    (when (and (zero? (count @(:state-atom sys)))
-               initial-inputs)
-      (doseq [msg initial-inputs]
-        (swap! (:state-atom sys) conj msg)))
-    sys))
-
-(defn managed-system-with-atoms [state-atom
-                                 history-manager-state-atom
-                                 initial-state sys-comp render-callback initial-inputs]
-  (let [sys (devrunner-with-atom state-atom initial-state sys-comp nil)
-        history-manager (HistoryManager. sys)
-        render-fn (fn [{:keys [state event-chan]}]
-                    (render-callback
-                     (-render history-manager { :state state
-                                                :event-chan event-chan })))
-        history (run-with-atom
-                 history-manager-state-atom
-                 {}
-                 history-manager
-                 render-fn)]
-    (if (and (zero? (count @(:state-atom sys)))
-             initial-inputs)
-      (doseq [msg initial-inputs]
-        (swap! (:state-atom sys) conj msg))
-      (put! (:event-chan history) [:history.render-no-op]))
-    { :system-manager history
-      :system sys }))
+                  :event-chan event-chan })
+       (html-edn (get-in derived-state [:__history-keeper :state]))])))
 
 (defn render-history-controls [{:keys [under-control can-go-back can-go-forward msg messages] :as sys} hist-chan]
   (sab/html
@@ -258,23 +238,32 @@
      input-messages
      event-chan)))
 
-(defn managed-system-card [initial-state component initial-inputs]
+(defn system-card [initial-state component initial-inputs]
   (reify
     IMountable
     (mount [_ {:keys [node data]}]
-      (let [new-ms (managed-system-with-atoms
-                    (or (get-in @data [:system :state-atom]) (atom []))
-                    (or (get-in @data [:system-manager :state-atom]) (atom {}))
-                    initial-state
-                    component
-                    (fn [react-dom]
-                      (when react-dom
-                        (render-to (sab/html react-dom) node identity)))
-                    initial-inputs)]
-        (reset! data new-ms)))
+      (let [sys (run-with-atom
+                 (or (:state-atom @data) (atom {})) 
+                 {}
+                 component
+                 (fn [state]
+                   (when-let [react-dom (-render component state)]
+                     (render-to (sab/html react-dom) node identity))))]
+        (if (and (= {} @(:state-atom sys))
+                 initial-inputs)
+          (doseq [msg initial-inputs]
+            (put! (:event-chan sys) msg))
+          (put! (:event-chan sys) [:history.render-no-op]))
+        (reset! data sys)))
     (unmount [_ {:keys [node data]}]
-      (when (get-in @data [:system :running])
-        (swap! data assoc :system (runner-stop (:system @data))) )
-      (when (get-in @data [:system-manager :running])
-        (swap! data assoc :system-manger (runner-stop (:system-manager @data))))
+      (when (:running @data)
+        (reset! data (runner-stop @data)))
       (.unmountComponentAtNode js/React node))))
+
+(defn managed-history-card [initial-state component initial-inputs]
+  (system-card {}
+               (HistoryManager.
+                (HistoryKeeper.
+                 component
+                 {}))
+               [[:inc] [:inc]]))

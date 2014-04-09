@@ -39,6 +39,7 @@
              (fn [effects]
                (concat effects args))))
 
+
 (defn compose [& components]
   (let [initializers    (filter #(satisfies? iPluginInit %) components)
         stoppers        (filter #(satisfies? iPluginStop %) components)
@@ -103,45 +104,82 @@
           (dissoc :__effects)))
     state))
 
-(defprotocol IMessageTransform
-  (message-transform [runnable msg state]))
+(defn state-from-msg-list [component
+                           msg-list
+                           initial-state]
+  (reduce (partial trans-helper* component identity)
+          initial-state
+          msg-list))
 
-(defprotocol IStateProcess
-  (state-process [runnable state]))
+(defn move-to-top [path state]
+  (if-let [d (get-in state path)]
+    (let [k (last path)
+          ns (update-in state
+                        (butlast path)
+                        (fn [s] (dissoc s k)))]
+      (assoc ns k d))
+    state))
+
+(defn move-effects-to-top [path state]
+  (move-to-top (conj path :__effects) state))
+
+(defrecord HistoryKeeper [system initial-state]
+  iPluginInit
+  (-initialize [o state event-chan]
+    (-initialize system state event-chan))
+  iPluginStop
+  (-stop [_]
+    (-stop system))
+  iInputFilter
+  (-filter-input [_ msg state]
+    (-filter-input system msg state))  
+  iTransform
+  (-transform [o msg state]
+    (if (= :__history-keeper.set-history (first msg))
+      (assoc-in state [:__history-keeper :history] (second msg))
+      (let [msg-history (vec (get-in state [:__history-keeper :history]))
+            prev-state (state-from-msg-list system
+                                            msg-history
+                                            initial-state)]
+        (move-effects-to-top
+           [:__history-keeper :state]
+           (assoc state
+             :__history-keeper { :history (conj msg-history msg)
+                          :initial-state initial-state ;; not needed here
+                          :state (-transform system msg prev-state) }))
+        )))
+  
+  iEffect
+  (-effect [o msg state event-chan effect-chan]
+    (-effect system msg (get-in state [:__history-keeper :state])
+             event-chan effect-chan))
+  iDerive
+  (-derive [o state]
+    (update-in state [:__history-keeper :state]
+               (fn [st]
+                 (-derive system st))))
+  iRenderable
+  (-render [_ rstate]
+    (-render system
+             (update-in rstate [:state]
+                        (fn [s] (get-in s [:__history-keeper :state]))))))
+
+(defn transform-with-effects [component effect-chan state msg]
+  (trans-helper* component 
+                 #(doseq [ef %]
+                    (put! effect-chan ef))
+                 state msg))
 
 (defrecord RunnableSystem [component initial-state state-atom event-chan effect-chan
-                           running state-callback]
-  IStateProcess
-  (state-process [r state] state)
-  IMessageTransform
-  (message-transform [r state msg]
-    (trans-helper* (:component r)
-                   #(doseq [ef %]
-                      (put! (:effect-chan r) ef))
-                   state msg)))
+                           running state-callback])
 
-(defrecord DevRunnableSystem [component initial-state state-atom event-chan effect-chan
-                              running state-callback]
-  IStateProcess
-  (state-process [r state]
-    (reduce (partial trans-helper* (:component r) identity)
-                                  (:intial-state r)
-                                  state))
-  IMessageTransform
-  (message-transform [r state msg]
-    (trans-helper* (:component r)
-                   #(doseq [ef %]
-                      (put! (:effect-chan r) ef))
-                   (state-process r state) 
-                   msg)
-    (conj state msg)))
+(defn message-transform [runnable state msg]
+  (transform-with-effects (:component runnable) (:effect-chan runnable)
+                           state msg))
 
 (defn make-runnable [component initial-state]
   (map->RunnableSystem {:component component
                         :initial-state initial-state}))
-
-(defn coerce-to-history-based-runnable [runnable]
-  (map->DevRunnableSystem runnable))
 
 (defn initialize [{:keys [component effect-chan event-chan] :as r}]
   (-initialize component effect-chan event-chan)
@@ -153,11 +191,13 @@
     (dev-null
      (map< (fn [msg]
              (-effect component msg
-                      (state-process r @state-atom)
+                      @state-atom
                       event-chan
                       effect-chan) true)
            effect-chan))
-    (assoc r :effect-chan effect-chan)))
+    (assoc r
+      :effect-chan effect-chan
+      :event-chan event-chan)))
 
 (defn listen-for-messages [{:keys [component state-atom event-chan effect-chan] :as r}]
   (let [event-chan (or event-chan (chan))
@@ -168,6 +208,7 @@
              (swap! state-atom (partial message-transform r) new-msg)))
            event-chan))
     (assoc r
+      :effect-chan effect-chan
       :event-chan event-chan)))
 
 (defn install-initial-state [{:keys [initial-state state-atom] :as r}]
@@ -182,8 +223,7 @@
     (add-watch state-atom
                :state-callback (fn [_ _ o n]
                                  (state-callback
-                                  { :state (-derive component
-                                                    (state-process r n))
+                                  { :state (-derive component n)
                                     :event-chan event-chan }))))
   r)
 
@@ -219,27 +259,6 @@
       (assoc :state-callback state-callback)
       runner-start))
 
-(defn devrunner-start [runnable]
-  (-> runnable
-      coerce-to-history-based-runnable
-      listen-for-effects
-      listen-for-messages
-      hook-up-state-callback
-      initialize
-      (assoc :running true)))
-
-(defn devrunner [initial-state component state-callback]
-  (-> (make-runnable component initial-state)
-      (assoc :state-atom (atom []))
-      (assoc :state-callback state-callback)
-      devrunner-start))
-
-(defn devrunner-with-atom [state-atom initial-state component state-callback]
-  (-> (make-runnable component initial-state)
-      (assoc :state-atom state-atom)
-      (assoc :state-callback state-callback)
-      devrunner-start))
-
 (defn run-with-initial-inputs [initial-state
                                comp*
                                state-callback
@@ -248,5 +267,3 @@
     (doseq [msg initial-inputs]
       (swap! (:state system) (partial message-transform system) msg))
     system))
-
-

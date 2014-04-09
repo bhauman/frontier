@@ -7,17 +7,18 @@
    [sablono.core :as sab :include-macros true]
    [frontier.core :refer [compose make-renderable
                           iTransform iRenderable -transform -render
+                          HistoryKeeper
                           make-runnable
                           runner-start
                           runner-stop]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
    [frontier.cards :as cards :refer [managed-system-card
+                                     system-card
                                      input-controls-renderer
-                                     managed-system]]
+                                     managed-history-card]]
    [reactor.core :refer [render-to] :as rct]
-   [frontier.util.edn-renderer :refer [html-edn]]   
-   [cljs.core.async :refer [chan]]
-   )
+   [devcards.util.edn-renderer :refer [html-edn]]   
+   [cljs.core.async :refer [chan]])
   (:require-macros
    [devcards.cards :refer [is are= are-not=]]
    [devcards.macros :refer [defonce]]))
@@ -30,22 +31,21 @@
 
 (defn todo-counter-app []
   (make-renderable
-   (compose
-    (ExampleCounter.)
-    (ExampleTodos.))
-   (fn [{:keys [state event-chan] :as rstate}]
-     [:div
-      ((input-controls-renderer [[:inc]
-                                 [:dec]
-                                 [:deccert]
-                                 [:create-todo {:content "do something"}]])
-       rstate)
-      #_(html-edn state)])))
+       (compose
+        (ExampleCounter.)
+        (ExampleTodos.))
+       (fn [{:keys [state event-chan] :as rstate}]
+         [:div
+          ((input-controls-renderer [[:inc]
+                                     [:dec]
+                                     [:deccerterer]
+                                     [:create-todo {:content "do something"}]])
+           rstate)])))
 
 (defcard managed-ex
-  (managed-system-card {}
-                       (todo-counter-app) 
-                       [[:inc] [:inc] ]))
+  (managed-history-card {}
+                        (todo-counter-app)
+                        [[:inc] [:inc]]))
 
 (def RunnableComponent
   (let [runnable (fn [this]

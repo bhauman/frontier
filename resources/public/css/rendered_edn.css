@@ -8,7 +8,8 @@
 }
 
 .rendered-edn .vector,
-.rendered-edn .set {
+.rendered-edn .set,
+.rendered-edn .seq  {
     padding-left: 0.9em;
     padding-right: 0.9em;
 }
@@ -24,7 +25,8 @@
 }
 
 .rendered-edn .vector,
-.rendered-edn .set {
+.rendered-edn .set,
+.rendered-edn .seq {
     display: inline-block;
     vertical-align: top;
 }
@@ -60,6 +62,7 @@
 
 .rendered-edn .collection.map > .opener,
 .rendered-edn .collection.vector > .opener,
+.rendered-edn .collection.seq > .opener,
 .rendered-edn .collection.set > .opener { 
    position: absolute;
    top: 0px;
@@ -73,6 +76,7 @@
 }
 
 .rendered-edn .collection.vector > .closer,  
+.rendered-edn .collection.seq > .closer,  
 .rendered-edn .collection.set > .closer {
    position: absolute;
    bottom: 0px;
