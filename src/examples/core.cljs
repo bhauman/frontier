@@ -12,8 +12,7 @@
                           runner-start
                           runner-stop]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
-   [frontier.cards :as cards :refer [managed-system-card
-                                     system-card
+   [frontier.cards :as cards :refer [system-card
                                      input-controls-renderer
                                      managed-history-card]]
    [reactor.core :refer [render-to] :as rct]
