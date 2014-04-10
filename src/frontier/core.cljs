@@ -43,7 +43,7 @@
              (fn [effects]
                (concat effects args))))
 
-;; need ot add will accept
+;; need to add will accept
 (defn compose [& components]
   (let [initializers    (filter #(satisfies? iPluginInit %) components)
         stoppers        (filter #(satisfies? iPluginStop %) components)
@@ -186,8 +186,6 @@
 (defn ns-scoped-channel [path channel]
   (map> (partial msg-prefix path) channel))
 
-
-
 (defrecord Namespacer [path system]
   iWillAccept
   (-will-accept? [_ [msg-name _]]
@@ -263,10 +261,7 @@
     (-derive system state))
   iRenderable
   (-render [_ rstate]
-    [:div
-     (-render system rstate)
-     #_(html-edn (:state rstate))
-     ]))
+    (-render system rstate)))
 
 (defrecord RunnableSystem [component initial-state state-atom event-chan effect-chan
                            running state-callback])

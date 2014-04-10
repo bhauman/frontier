@@ -20,7 +20,8 @@
                                      managed-history-card]]
    [reactor.core :refer [render-to] :as rct]
    [devcards.util.edn-renderer :refer [html-edn]]   
-   [cljs.core.async :refer [chan]])
+   [cljs.core.async :refer [chan]]
+   [om.core :as om :include-macros true])
   (:require-macros
    [devcards.cards :refer [is are= are-not=]]
    [devcards.macros :refer [defonce]]))
@@ -43,7 +44,7 @@
                                      [:deccerterer]
                                      [:create-todo {:content "do something"}]])
            rstate)
-          (html-edn state)])))
+          #_(html-edn state)])))
 
 (defcard managed-ex
   (managed-history-card { :strange {:money { } }}
@@ -54,7 +55,8 @@
                         [[[:strange :money :inc] nil]
                          [[:strange :money :inc] nil]]))
 
-(defcard new-history-keeper
+
+#_(defcard new-history-keeper
   (system-card {}
                (HistoryManager.
                 (Namespacer. :__history-keeper
@@ -211,9 +213,6 @@
             ev ef)
    (print "ev" (<! ev))
    (print "ef" (<! ef))) )
-
-
-
 
 (comment
 

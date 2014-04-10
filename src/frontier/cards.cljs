@@ -76,8 +76,6 @@
 (defn current-state**
   ([{:keys [history state] :as virt-state} pointer component]
      (let [initial-state (get-in component [:system :initial-state])]
-       (print component)
-       (print initial-state)
        (-derive component
                 (if (or (zero? pointer)
                         (zero? (count history)))
@@ -90,9 +88,7 @@
                               (msg-prefix [:__history-keeper] (last temp-history))
                               {:__history-keeper {:state state
                                                   :initial-state initial-state
-                                                  :history (butlast temp-history) }}))))
-       )
-     )
+                                                  :history (butlast temp-history) }}))))))
   ([{:keys [history] :as virt-state} component]
      (current-state** virt-state (count history) component)))
 
@@ -170,8 +166,9 @@
        (-render virtual-system
                 { :state derived-state
                   :event-chan event-chan })
-       #_(html-edn (get-in derived-state [:__history-keeper :state]))
-       (html-edn state)])))
+       (html-edn (get-in derived-state [:__history-keeper :state]))
+       #_(html-edn state)
+       ])))
 
 (defn render-history-controls [{:keys [under-control can-go-back can-go-forward msg messages] :as sys} hist-chan]
   (sab/html
@@ -285,4 +282,10 @@
                  (history-manager initial-state'
                                   component)
                  inputs)))
+
+;; the handling of initial state is super wonky
+;; maybe components should have a IGetInitialState portocol?
+;; I am going to end up with the whole react / om protocol by
+;; derivation??
+
 

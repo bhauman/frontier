@@ -41,7 +41,7 @@
            (fn [e]
              #_(.log js/console "reload callback happening")
              (put! devcard-event-chan [:jsreload])))
-      (watch-and-reload))))
+      (watch-and-reload :retry-count 50))))
 
 (defn register-card [path tags func]
   (put! devcard-event-chan

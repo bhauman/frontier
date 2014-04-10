@@ -20,7 +20,7 @@
       (swap! file-md5-cache assoc filename check-sum)
       true)))
 
-(def logger-chan (chan))
+(def logger-chan (chan (sliding-buffer 100)))
 (defn log [& args] (put! logger-chan args))
 
 (defn prnt []

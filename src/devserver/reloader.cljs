@@ -5,9 +5,6 @@
    [clojure.set :refer [union]]
    [cljs.reader :refer [read-string]]))
 
-(defn log [d]
-  (.log js/console (clj->js d)))
-
 (def namespaces-to-watch (atom #{}))
 
 (def namespaces-to-ignore (atom #{}))
@@ -17,8 +14,6 @@
 
 (defn ^:export reset-watched-namespaces []
   (reset! namespaces-to-watch #{}))
-
-(log @namespaces-to-watch)
 
 (defn path-to-ns [url]
   (let [no-ext (string/replace url #"\.js$" "")
@@ -40,10 +35,10 @@
       (.addCallback deferred
                     (fn [] (.trigger (js/$ "body") "devserverJsReload"))))))
 
-(defn watch-and-reload [try-count]
+(defn watch-and-reload [& {:keys [retry-count]}]
   (set! js/COMPILED true)
   (.log js/console "trying to open cljs reload socket")  
-  (let [try-count (or try-count 0)
+  (let [retry-count (or retry-count 0)
         socket (js/WebSocket. "ws:localhost:8080/ws")]
     (set! (.-onmessage socket) (fn [msg-str]
                                  #_(log msg-str)
@@ -57,9 +52,9 @@
                                (.log js/console "SOCKET CONNECTION ESTABLISHED: " x)))
     (set! (.-onclose socket) (fn [x]
                                (.log js/console "SOCKET CLOSED: " x)
-                               (if (< try-count 50)
+                               (if (> retry-count 0)
                                  (.setTimeout js/window
                                               (fn []
-                                                (watch-and-reload (inc try-count)))
+                                                (watch-and-reload :retry-count (dec retry-count)))
                                               2000))))
     (set! (.-onerror socket) (fn [x] (.log js/console "SOCKET ERROR: " x)))))
