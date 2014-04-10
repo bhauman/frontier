@@ -32,6 +32,11 @@
 ;; yes i'm doing this :)
 (defonce file-change-atom (atom (list)))
 
+(defonce compile-wait-time* (atom 500))
+
+(defn set-wait-time! [ms]
+  (reset! compile-wait-time* ms))
+
 (defn setup-file-change-sender [wschannel]
   (let []
     (add-watch file-change-atom :message-watch
@@ -40,7 +45,7 @@
                    (log "sending message")
                    (log msg)
                    (when msg
-                     (<!! (timeout 500))
+                     (<!! (timeout @compile-wait-time*))
                      (when (and (file-contents-changed? (:local-path msg))
                                 (open? wschannel))
                        (send! wschannel (prn-str msg))))

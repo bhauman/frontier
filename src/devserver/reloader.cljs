@@ -40,10 +40,11 @@
       (.addCallback deferred
                     (fn [] (.trigger (js/$ "body") "devserverJsReload"))))))
 
-(defn watch-and-reload []
+(defn watch-and-reload [try-count]
   (set! js/COMPILED true)
-  (.log js/console "opening cljs reload socket")
-  (let [socket (js/WebSocket. "ws:localhost:8080/ws")]
+  (.log js/console "trying to open cljs reload socket")  
+  (let [try-count (or try-count 0)
+        socket (js/WebSocket. "ws:localhost:8080/ws")]
     (set! (.-onmessage socket) (fn [msg-str]
                                  #_(log msg-str)
                                  #_(.log js/console msg-str)
@@ -51,7 +52,14 @@
                                  (let [msg (read-string (.-data msg-str))]
                                    (when (= (:msg-name msg) :file-changed)
                                      (js-reload (:file msg))))))
-    (set! (.-onclose socket) (fn [x] "SOCKET CLOSED"))
-    (set! (.-onerror socket) (fn [x] "SOCKET ERROR"))))
-
-
+    (set! (.-onopen socket)  (fn [x]
+                               (.log js/console "cljs reload socket opened")
+                               (.log js/console "SOCKET CONNECTION ESTABLISHED: " x)))
+    (set! (.-onclose socket) (fn [x]
+                               (.log js/console "SOCKET CLOSED: " x)
+                               (if (< try-count 50)
+                                 (.setTimeout js/window
+                                              (fn []
+                                                (watch-and-reload (inc try-count)))
+                                              2000))))
+    (set! (.-onerror socket) (fn [x] (.log js/console "SOCKET ERROR: " x)))))

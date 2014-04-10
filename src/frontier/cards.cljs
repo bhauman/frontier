@@ -15,6 +15,7 @@
                           iRenderable
                           iPluginStop
                           HistoryKeeper
+                          Namespacer
                           -stop
                           -render
                           -derive
@@ -22,94 +23,115 @@
                           -transform
                           -initialize
                           -filter-input
-                          trans-helper*
                           runner-stop
                           run-with-atom
-                          add-effects
-                          compose
-                          move-effects-to-top]]
+                          msg-prefix
+                          msg->local-msg]]
    [jayq.util :refer [log]]))
 
-(defn can-go-forward? [{:keys [pointer]} history]
-  (< pointer (count history)))
+(defn can-go-forward? [{:keys [pointer __history-keeper]}]
+  (< pointer (count (:history __history-keeper))))
 
-(defn can-go-back? [{:keys [pointer]}] (pos? pointer))
+(defn can-go-back? [{:keys [pointer]}]
+  (pos? pointer))
 
-(defn under-control? [system history]
-  (not= (:pointer system ) (count history)))
+(defn under-control? [{:keys [pointer __history-keeper]}]
+  (not= pointer
+        (count (:history __history-keeper))))
 
-(defn current-state*
-  ([{:keys [initial-state history] :as virt-state } pointer component]
-     (-derive component
-                      (if (zero? pointer)
-                        {:__history-keeper {:state initial-state
-                                     :initial-state initial-state
-                                     :history [] }}
-                        (reduce (partial trans-helper* component identity)
-                                initial-state
-                                (subvec history
-                                        0 pointer)))))
-  ([{:keys [history] :as virt-state} component]
-     (current-state* virt-state (count history) component)))
+(defn msg-history [state]
+  (get-in state [:__history-keeper :history]))
 
 (defmulti hist-trans first)
 
-(defmethod hist-trans :default [_ system _] system)
+(defmethod hist-trans :default [_ state _] state)
 
-(defmethod hist-trans :history.goto [[_ p] sys _]
-  (assoc-in sys :pointer p))
+(defmethod hist-trans :history.goto [[_ pointer] state _]
+  (assoc state :pointer pointer))
 
-(defmethod hist-trans :history.back [_ sys _]
-  (if (can-go-back? sys)
-    (update-in sys [:pointer] dec)
-    sys))
+(defmethod hist-trans :history.back [_ state _]
+  (if (can-go-back? state)
+    (update-in state [:pointer] dec)
+    state))
 
-(defmethod hist-trans :history.forward [_ sys {:keys [history]}]
-  (if (can-go-forward? sys history)
-    (update-in sys [:pointer] inc)
-    sys))
+(defmethod hist-trans :history.forward [_ state _]
+  (if (can-go-forward? state)
+    (update-in state [:pointer] inc)
+    state))
 
-(defmethod hist-trans :history.keep [_ {:keys [pointer] :as sys} {:keys [history]}]
-  (add-effects sys [:history.set-state (subvec history 0 pointer)]))
+(defmethod hist-trans :history.keep [_ {:keys [pointer] :as state} _]
+  (update-in state [:__history-keeper :history]
+             (fn [history] (subvec history 0 pointer))))
 
-(defmethod hist-trans :history.cancel [_ sys {:keys [history]}]
-  (assoc sys :pointer (count history)))
+(defmethod hist-trans :history.cancel [_ state _]
+  (assoc state :pointer
+         (count (msg-history state))))
 
 ;; derivatives
 
-(defn under-control [system history]
+(defn under-control [system]
   (assoc system :under-control
-         (under-control? system history)))
+         (under-control? system)))
 
-(defn render-state [hist-state virt-state comp*]
-  (assoc hist-state :render-stater
-         (if (under-control? hist-state (:history virt-state))
-           (current-state* virt-state (:pointer hist-state) comp*)
-           (current-state* virt-state comp*))))
+(defn current-state**
+  ([{:keys [history state] :as virt-state} pointer component]
+     (let [initial-state (get-in component [:system :initial-state])]
+       (print component)
+       (print initial-state)
+       (-derive component
+                (if (or (zero? pointer)
+                        (zero? (count history)))
+                {:__history-keeper {:state (:state initial-state)
+                                    :initial-state initial-state
+                                    :history [] }}
+                (let [temp-history (subvec history
+                                           0 pointer)]
+                  (-transform component
+                              (msg-prefix [:__history-keeper] (last temp-history))
+                              {:__history-keeper {:state state
+                                                  :initial-state initial-state
+                                                  :history (butlast temp-history) }}))))
+       )
+     )
+  ([{:keys [history] :as virt-state} component]
+     (current-state** virt-state (count history) component)))
 
-(defn can-go-forward [state history]
+(defn render-state [{:keys [__history-keeper] :as state} comp*]
+    (assoc state :render-stater
+           (if (under-control? state)
+             (current-state** __history-keeper (:pointer state) comp*)
+             (current-state** __history-keeper comp*))))
+
+(defn can-go-forward [state]
   (assoc state :can-go-forward
-         (can-go-forward? state history)))
+         (can-go-forward? state)))
 
 (defn can-go-back [state]
   (assoc state :can-go-back
          (can-go-back? state)))
 
-(defn add-msg [state history]
-  (assoc state :msg (get history (dec (:pointer state)))))
+(defn add-msg [state]
+  (assoc state :msg
+         (msg->local-msg [:state]
+                         (get (msg-history state)
+                              (dec (:pointer state))))))
 
-(defn messages [state history]
+(defn messages [state]
   (assoc state :messages
-         (take 20 (reverse (map-indexed (fn [i x] [(inc i) x]) history)))))
+         (take 20 (reverse (map-indexed (fn [i x] [(inc i) x])
+                                        (map
+                                         (partial msg->local-msg [:state])
+                                         (msg-history state)))))))
 
 (declare render-history-controls)
 
 (defn history-message? [msg]
-  (-> (first msg)
-      name
-      (string/split #"\.")
-      first
-      (= "history")))
+  (and (keyword? (first msg))
+       (-> (first msg)
+           name
+           (string/split #"\.")
+           first
+           (= "history"))))
 
 (defrecord HistoryManager [virtual-system]
   iPluginInit
@@ -124,44 +146,32 @@
   iTransform
   (-transform [o msg state]
     (if (history-message? msg)
-      (move-effects-to-top
-       [:__history-manager]
-       (update-in state [:__history-manager]
-                  (fn [hist-state]
-                    (hist-trans msg hist-state (:__history-keeper state)))))
+      (hist-trans msg state (:__history-keeper state))
       (let [new-state (-transform virtual-system msg state)]
-        (assoc-in
-         new-state
-         [:__history-manager :pointer]
+        (assoc new-state :pointer
          (count (get-in new-state [:__history-keeper :history]))))))
   iEffect
   (-effect [o msg state event-chan effect-chan]
-    (if (= (first msg) :history.set-state)
-      (put! event-chan [:__history-keeper.set-history (second msg)])
-      (-effect virtual-system msg state event-chan effect-chan)))
-  
+    (-effect virtual-system msg state event-chan effect-chan))
   iDerive
   (-derive [o state]
-    (let [history (get-in state [:__history-keeper :history])]
-      (update-in state
-                 [:__history-manager]
-                 (fn [hist-state]
-                   (-> hist-state
-                       (under-control history) 
-                       (can-go-forward history) 
-                       can-go-back
-                       (add-msg history)
-                       (messages history)
-                       (render-state (:__history-keeper state) virtual-system))))))
+    (-> state
+        under-control
+        can-go-forward
+        can-go-back
+        add-msg
+        messages
+        (render-state virtual-system)))
   iRenderable
   (-render [_ {:keys [state event-chan] :as hist-state}]
-    (let [derived-state (get-in state [:__history-manager :render-stater])]
+    (let [derived-state (:render-stater state)]
       [:div
-       (render-history-controls (:__history-manager state) event-chan)
+       (render-history-controls state event-chan)
        (-render virtual-system
                 { :state derived-state
                   :event-chan event-chan })
-       (html-edn (get-in derived-state [:__history-keeper :state]))])))
+       #_(html-edn (get-in derived-state [:__history-keeper :state]))
+       (html-edn state)])))
 
 (defn render-history-controls [{:keys [under-control can-go-back can-go-forward msg messages] :as sys} hist-chan]
   (sab/html
@@ -243,13 +253,13 @@
     IMountable
     (mount [_ {:keys [node data]}]
       (let [sys (run-with-atom
-                 (or (:state-atom @data) (atom {})) 
-                 {}
+                 (or (:state-atom @data) (atom nil)) 
+                 initial-state
                  component
                  (fn [state]
                    (when-let [react-dom (-render component state)]
                      (render-to (sab/html react-dom) node identity))))]
-        (if (and (= {} @(:state-atom sys))
+        (if (and (nil? (:state-atom @data))
                  initial-inputs)
           (doseq [msg initial-inputs]
             (put! (:event-chan sys) msg))
@@ -260,10 +270,19 @@
         (reset! data (runner-stop @data)))
       (.unmountComponentAtNode js/React node))))
 
+(defn history-manager [initial-state component]
+  (HistoryManager.
+   (Namespacer.
+    :__history-keeper
+    (HistoryKeeper.
+     (Namespacer. :state component)
+     (:__history-keeper initial-state)))))
+
 (defn managed-history-card [initial-state component initial-inputs]
-  (system-card {}
-               (HistoryManager.
-                (HistoryKeeper.
-                 component
-                 {}))
-               [[:inc] [:inc]]))
+  (let [inputs (mapv (partial msg-prefix [:__history-keeper :state]) initial-inputs)
+        initial-state' (assoc-in {} [:__history-keeper :state] initial-state)]
+    (system-card initial-state'
+                 (history-manager initial-state'
+                                  component)
+                 inputs)))
+

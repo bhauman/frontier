@@ -3,16 +3,19 @@
    [devcards.core :refer-macros [defcard]]
    [devcards.cards 
     :refer [react-card sab-card test-card edn-card]]
+   
    [crate.core :as c]
    [sablono.core :as sab :include-macros true]
    [frontier.core :refer [compose make-renderable
                           iTransform iRenderable -transform -render
                           HistoryKeeper
+                          Namespacer
                           make-runnable
                           runner-start
                           runner-stop]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
    [frontier.cards :as cards :refer [system-card
+                                     HistoryManager
                                      input-controls-renderer
                                      managed-history-card]]
    [reactor.core :refer [render-to] :as rct]
@@ -39,12 +42,27 @@
                                      [:dec]
                                      [:deccerterer]
                                      [:create-todo {:content "do something"}]])
-           rstate)])))
+           rstate)
+          (html-edn state)])))
 
 (defcard managed-ex
-  (managed-history-card {}
-                        (todo-counter-app)
-                        [[:inc] [:inc]]))
+  (managed-history-card { :strange {:money { } }}
+                        (Namespacer. [:strange :money]
+                                     (todo-counter-app))
+                        #_[]
+                        #_[[:inc] [:inc]]
+                        [[[:strange :money :inc] nil]
+                         [[:strange :money :inc] nil]]))
+
+(defcard new-history-keeper
+  (system-card {}
+               (HistoryManager.
+                (Namespacer. :__history-keeper
+                             (HistoryKeeper.
+                              (Namespacer. :state (todo-counter-app))
+                              {})))
+               [[[:__history-keeper :state :inc]]
+                [[:__history-keeper :state :inc]]]))
 
 (def RunnableComponent
   (let [runnable (fn [this]
@@ -130,6 +148,73 @@
    [:examples.core :edn-card-ex]
    (.getElementById js/document "main-area"))
 
+#_(defrecord NsTester []
+  iInputFilter
+  (-filter-input [_ [msg-name data] state]
+    (if (= :doit msg-name)
+      [:darn-it data]
+      [msg-name data]))
+  iTransform
+  (-transform [o msg state]
+    (if (= (first msg) :hello)
+      (-> state
+          (assoc :count (+ (:count state) (:add (last msg))))
+          (add-effects [:wowzers {}]))
+      state))
+  iEffect
+  (-effect [o msg state event-chan effect-chan]
+    (put! event-chan [:msg-c  msg] )
+    (put! effect-chan [:state-c state]))
+  iDerive
+  (-derive [o state]
+    (assoc state
+      :double (* 2 (:count state)))))
+
+#_(def o (Namespacer.
+        :myname
+        (make-renderable
+         (compose
+          (NsTester.)
+          )
+         (fn [{:keys [state event-chan]}]
+           (put! event-chan [:hello {:dd :top}])
+           [:div state]))
+        ))
+
+#_(print (-filter-input o [[:myname :doit] {:fiver 1}] {}))
+
+
+#_(print "" (-transform o [[:myname :hello] {:add 4}] {}))
+
+#_(print (-derive o {:myname {:count 5}}))
+
+#_(go
+ (let [ev (chan)]
+   (print (-render o
+            {:state {:myname {:counterific 2}}
+             :event-chan ev}))
+   (print "ev-render " (<! ev))) )
+
+#_(let [c (chan)
+      scoped-chan (ns-scoped-channel :myname c)]
+  (put! scoped-chan [:hello {:add 40}])
+  (go
+   (print (<! c)))  
+  )
+
+#_(go
+ (let [ev (chan)
+       ef (chan)]
+   (-effect o
+            [[:mynamer :creep :effect-name] {:data 1}]
+            {:myname {:counterific 2}}
+            ev ef)
+   (print "ev" (<! ev))
+   (print "ef" (<! ef))) )
+
+
+
+
 (comment
 
 (defcard fortunater
@@ -154,7 +239,6 @@
    (are-not= 5 5)
    (are-not= 5 5)
    (are-not= 5 6))))
-
 
 (defn log [d]
   (.log js/console d))
