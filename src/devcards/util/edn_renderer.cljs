@@ -28,7 +28,7 @@
    [:span.closer closer]])
 
 (defn html-keyval [[k v]]
-  [:span.keyval
+  [:span.keyval {:key (prn-str k)}
    (html k)
    [:span.separator " "]
    (html v)])

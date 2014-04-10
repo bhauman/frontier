@@ -51,7 +51,8 @@
       (add-effects [:store-changes data])
       (update-in [:todos]
                  (fn [todos]
-                   (vec (conj todos data))))))
+                   (assoc (or todos {})
+                     (:id data) data)))))
 
 (defmethod todo-trans :delete-todo [_ system data]
   (update-in system

@@ -1,28 +1,35 @@
 (ns examples.core
   (:require
    [devcards.core :refer-macros [defcard]]
+   [devcards.system :refer [IMountable]]
    [devcards.cards 
     :refer [react-card sab-card test-card edn-card]]
-   
    [crate.core :as c]
    [sablono.core :as sab :include-macros true]
    [frontier.core :refer [compose make-renderable
-                          iTransform iRenderable -transform -render
+                          iTransform iRenderable -transform -render -derive
+                          -filter-input
+                          -initialize
+                          -stop
+                          -effect
+                          transform-with-effects
                           HistoryKeeper
-                          Namespacer
+                          Namespacer                          
                           make-runnable
                           runner-start
                           runner-stop]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
    [frontier.cards :as cards :refer [system-card
                                      HistoryManager
+                                     history-manager
                                      input-controls-renderer
                                      managed-history-card]]
    [reactor.core :refer [render-to] :as rct]
    [devcards.util.edn-renderer :refer [html-edn]]   
-   [cljs.core.async :refer [chan]]
+   [cljs.core.async :refer [chan close! <!]]
    [om.core :as om :include-macros true])
   (:require-macros
+   [cljs.core.async.macros :refer [go-loop]]
    [devcards.cards :refer [is are= are-not=]]
    [devcards.macros :refer [defonce]]))
 
@@ -44,7 +51,7 @@
                                      [:deccerterer]
                                      [:create-todo {:content "do something"}]])
            rstate)
-          #_(html-edn state)])))
+          (html-edn state)])))
 
 (defcard managed-ex
   (managed-history-card { :strange {:money { } }}
@@ -54,7 +61,6 @@
                         #_[[:inc] [:inc]]
                         [[[:strange :money :inc] nil]
                          [[:strange :money :inc] nil]]))
-
 
 #_(defcard new-history-keeper
   (system-card {}
@@ -66,6 +72,60 @@
                [[[:__history-keeper :state :inc]]
                 [[:__history-keeper :state :inc]]]))
 
+;; working with om
+(defn widget [data owner]
+  (reify
+    om/IRender
+    (render [this]
+      (print data)
+      (sab/html [:h1 "thi heh? " (:text data)]))))
+
+(defn scoped-cursor-state [cursor]
+  (get-in @(om/-state cursor) (om/-path cursor)))
+
+
+(defn omcard [om-comp initial-state]
+  (reify IMountable
+    (mount [_ {:keys [node data]}]
+      (print "looking at data")
+      (print data)
+      (when (or (nil? @data)
+                (= {} @data))
+        (reset! data initial-state))
+      (om/root om-comp data {:target node}))
+    (unmount [_ {:keys [node]}]
+      (.unmountComponentAtNode js/React node))))
+
+(defcard omcard-frontier-ex2
+    (omcard (om-frontier-comp (history-manager {:hello 5} (todo-counter-app))) {:hello 5}))
+
+(defcard omcard-frontier-ex
+    (omcard (om-frontier-comp (todo-counter-app)) {:hello 5}))
+
+(defcard omcard-ex
+    (omcard widget {}))
+
+#_(defn om-comper [cursor owner]
+  (print cursor)
+  (reify
+    om/IRender
+    (render [this]
+      (sab/html [:div
+                 (om/build
+                  #_widget
+                  (om-frontier-comp (todo-counter-app) { :hello 5 })
+                  (:fun cursor))]))))
+
+
+#_(let [el (.getElementById js/document "main-area")]
+  (om/root
+   #_om-comper
+   (om-frontier-comp (todo-counter-app) { :hello 5 })
+   (atom { :fun {:times {}}})
+   {:target el}))
+
+
+;; trying react
 (def RunnableComponent
   (let [runnable (fn [this]
                    (rct/get-prop-val this "runnable"))]

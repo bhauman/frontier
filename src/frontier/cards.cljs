@@ -268,18 +268,19 @@
       (.unmountComponentAtNode js/React node))))
 
 (defn history-manager [initial-state component]
-  (HistoryManager.
-   (Namespacer.
-    :__history-keeper
-    (HistoryKeeper.
+  (let [initial-state' (assoc-in {} [:__history-keeper :state] initial-state)]
+    (HistoryManager.
+     (Namespacer.
+      :__history-keeper
+      (HistoryKeeper.
      (Namespacer. :state component)
-     (:__history-keeper initial-state)))))
+     (:__history-keeper initial-state'))))))
 
 (defn managed-history-card [initial-state component initial-inputs]
   (let [inputs (mapv (partial msg-prefix [:__history-keeper :state]) initial-inputs)
         initial-state' (assoc-in {} [:__history-keeper :state] initial-state)]
     (system-card initial-state'
-                 (history-manager initial-state'
+                 (history-manager initial-state
                                   component)
                  inputs)))
 
