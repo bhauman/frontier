@@ -11,8 +11,7 @@
 (enable-console-print!)
 
 (defn- dev-null [in]
-  (go-loop [v (<! in)]
-           (if (nil? v) :closed (recur (<! in)))))
+  (go-loop [] (if (nil? (<! in)) :closed (recur))))
 
 (defprotocol iPluginInit
   (-initialize [_ effect-chan event-chan]))
@@ -35,6 +34,7 @@
 (defprotocol iRenderable
   (-render [_ state]))
 
+;; only using this for namespacing right now
 (defprotocol iWillAccept
   (-will-accept? [o msg]))
 
@@ -186,6 +186,9 @@
 (defn ns-scoped-channel [path channel]
   (map> (partial msg-prefix path) channel))
 
+;; this an interesting exploration but not conviced that
+;; it's the best way to do this
+;; cursors are very interesting
 (defrecord Namespacer [path system]
   iWillAccept
   (-will-accept? [_ [msg-name _]]
@@ -262,6 +265,8 @@
   iRenderable
   (-render [_ rstate]
     (-render system rstate)))
+
+;; default system runner
 
 (defrecord RunnableSystem [component initial-state state-atom event-chan effect-chan
                            running state-callback])
@@ -351,12 +356,3 @@
       (assoc :state-atom state-atom)
       (assoc :state-callback state-callback)
       runner-start))
-
-(defn run-with-initial-inputs [initial-state
-                               comp*
-                               state-callback
-                               initial-inputs]
-  (let [system (run initial-state comp* state-callback)]
-    (doseq [msg initial-inputs]
-      (swap! (:state system) (partial message-transform system) msg))
-    system))

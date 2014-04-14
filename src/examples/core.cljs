@@ -1,6 +1,6 @@
 (ns examples.core
   (:require
-   [devcards.core :refer-macros [defcard]]
+   [devcards.core :refer-macros [defcard hidecard]]
    [devcards.system :refer [IMountable]]
    [devcards.cards 
     :refer [react-card sab-card test-card edn-card]]
@@ -18,6 +18,7 @@
                           make-runnable
                           runner-start
                           runner-stop]]
+   [frontier.adaptors :refer [om-adaptor]]
    [frontier.example.components :refer [ExampleTodos ExampleCounter]]
    [frontier.cards :as cards :refer [system-card
                                      HistoryManager
@@ -48,10 +49,10 @@
          [:div
           ((input-controls-renderer [[:inc]
                                      [:dec]
-                                     [:deccerterer]
+                                     [:deccererted]
                                      [:create-todo {:content "do something"}]])
            rstate)
-          (html-edn state)])))
+          #_(html-edn state)])))
 
 (defcard managed-ex
   (managed-history-card { :strange {:money { } }}
@@ -80,10 +81,6 @@
       (print data)
       (sab/html [:h1 "thi heh? " (:text data)]))))
 
-(defn scoped-cursor-state [cursor]
-  (get-in @(om/-state cursor) (om/-path cursor)))
-
-
 (defn omcard [om-comp initial-state]
   (reify IMountable
     (mount [_ {:keys [node data]}]
@@ -97,10 +94,10 @@
       (.unmountComponentAtNode js/React node))))
 
 (defcard omcard-frontier-ex2
-    (omcard (om-frontier-comp (history-manager {:hello 5} (todo-counter-app))) {:hello 5}))
+    (omcard (om-adaptor (history-manager {:hello 5} (todo-counter-app))) {:hello 5}))
 
 (defcard omcard-frontier-ex
-    (omcard (om-frontier-comp (todo-counter-app)) {:hello 5}))
+    (omcard (om-adaptor (todo-counter-app)) {:hello 5}))
 
 (defcard omcard-ex
     (omcard widget {}))

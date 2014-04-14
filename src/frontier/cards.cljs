@@ -273,8 +273,8 @@
      (Namespacer.
       :__history-keeper
       (HistoryKeeper.
-     (Namespacer. :state component)
-     (:__history-keeper initial-state'))))))
+       (Namespacer. :state component)
+       (:__history-keeper initial-state'))))))
 
 (defn managed-history-card [initial-state component initial-inputs]
   (let [inputs (mapv (partial msg-prefix [:__history-keeper :state]) initial-inputs)
@@ -285,7 +285,7 @@
                  inputs)))
 
 ;; the handling of initial state is super wonky
-;; maybe components should have a IGetInitialState portocol?
+;; maybe components should have a IGetInitialState protocol?
 ;; I am going to end up with the whole react / om protocol by
 ;; derivation??
 

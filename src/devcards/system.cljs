@@ -80,6 +80,12 @@
 
 ;; derivatives
 
+(declare visible-card-nodes)
+
+(defn visible-cards [state]
+  (assoc state
+    :visible-card-nodes (visible-card-nodes state)))
+
 (defn display-current-cards [state]
   (let [cur (current-page state)]
     (if (devcard? cur)
@@ -89,6 +95,18 @@
             (filter (complement (comp devcard? second)) cur))
           (assoc :display-cards
             (filter (comp devcard? second) cur))))))
+
+(defn render-cards? [state]
+  ;; impure as we are relying on the dom state to calculate this but since
+  ;; we aren't using react this is a good way to diff the nodes on
+  ;; on the page
+  (let [visible-cards  (map (comp :path first) (:visible-card-nodes state))
+        intended-cards (keep :path
+                             (concat [(:display-single-card state)]
+                                     (vals (:display-cards state))))]
+    (assoc state
+      :render-cards (not= (set visible-cards)
+                          (set intended-cards)))))
 
 (defn breadcrumbs [{:keys [current-path] :as state}]
   (let [cpath (map name (cons :home current-path))
@@ -100,10 +118,10 @@
                           (repeat (vec cpath))))))]
     (assoc state :breadcrumbs crumbs)))
 
+
 (defrecord DevCards []
   iInputFilter
   (-filter-input [o msg state]
-    (print (first msg))
     (ifilter msg state))
   iTransform
   (-transform [o msg state]
@@ -111,7 +129,9 @@
   iDerive
   (-derive [o state]
     (-> state
+        visible-cards
         display-current-cards
+        render-cards?
         breadcrumbs)))
 
 (defrecord CurrentPathSessionStorage []
@@ -129,11 +149,14 @@
   [:div.devcard-rendered-card {:id (unique-card-id path)}])
 
 (defn card-template [{:keys [path] :as card}]
-  [:div.panel.panel-default.devcard-panel
-   [:div.panel-heading.devcards-set-current-path
-    {:data-path (string/join ":::" (map name path))}
-    [:span.panel-title (name (last path)) " "]]
-   (naked-card card)])
+  (if-not (some #(= % :hidden) (:tags card))
+    [:div.panel.panel-default.devcard-panel
+     [:div.panel-heading.devcards-set-current-path
+      {:data-path (string/join ":::" (map name path))}
+      [:span.panel-title (name (last path)) " "]]
+     (naked-card card)]
+    [:span]))
+
 
 (defn display-cards [cards]
   (map (comp card-template second) 
@@ -162,24 +185,29 @@
   [:div
    [:div.navbar.navbar-default.navbar-inverse.navbar-static-top
     [:div.container
-    [:div.navbar-header
-     [:a.navbar-brand "Devcards"]]]]
+     [:div.navbar-header
+      [:a.navbar-brand "Devcards"]]]]
    [:div.container
     [:div.row
      [:div.col-md-9
       (when-let [crumbs (:breadcrumbs data)]
         (breadcrumbs-templ crumbs))
       (when-let [dir-paths (:display-dir-paths data)] 
-        (dir-links dir-paths))
-      (when-let [cards (:display-cards data)]
-        (display-cards cards))
-      (when-let [card (:display-single-card data)]
-        (naked-card card))]
+        (dir-links dir-paths))]
      [:div.col-md-3
       ]
      ]
     ]
    ])
+
+(defn cards-templates [data] 
+  [:div.container
+   [:div.row
+    [:div.col-md-9
+     (when-let [cards (:display-cards data)]
+       (display-cards cards))
+     (when-let [card (:display-single-card data)]
+       (naked-card card))]]])
 
 (defn to-node [jq]
   (aget (.get jq) 0)) 
@@ -196,24 +224,19 @@
               identity)
              card-nodes))))
 
+(defn create-needed-card-nodes [data]
+  (when (:render-cards data)
+    #_(print "rendering cards")
+    (.html ($ "#devcards-cards") (c/html (cards-templates data)))
+    ;; otherwise leave the nodes as they are))
+
 (defn unmount-card-nodes [data]
-  (doseq [[card node] (visible-card-nodes data)]
+  (doseq [[card node] (:visible-card-nodes data)]
     (when-let [card  (get-in data (cons :cards (unique-card-id->path (.-id node))))]
       (let [functionality ((:func card))]
           (when (satisfies? IMountable functionality)
             (unmount functionality { :node node
-                                    :data (:data-atom card)}))))))
-
-(defn mount-card-nodes-old [data]
-  (let [card-nodes (sel-nodes ".devcard-rendered-card")]
-    (doseq [node card-nodes]
-      (when-let [card (get-in data (cons :cards (unique-card-id->path (.-id node))))]
-        (let [functionality ((:func card))
-             arg { :node node
-                   :data (:data-atom card) }]
-         (if (satisfies? IMountable functionality)
-           (mount functionality arg)
-           (apply functionality [arg])))))))
+                                     :data (:data-atom card)}))))))
 
 (defn mount-card-nodes [data]
   (doseq [[card node] (visible-card-nodes data)]
@@ -226,10 +249,9 @@
 
 (defn devcard-renderer [{:keys [state event-chan]}]
   (unmount-card-nodes state)
-  (.html ($ "#devcards") (c/html (main-template state)))
+  (.html ($ "#devcards-controls") (c/html (main-template state)))
+  (create-needed-card-nodes state)
   (mount-card-nodes state))
-
-
 
 (def devcard-initial-data { :current-path []
                             :position 0
@@ -281,18 +303,3 @@
              (when-let [v (<! tq)]
                (f v) (recur)))
     (fn [x] (put! q x))))
-
-#_(defn throttle-renderer [f ms]
-    (let [q (chan (sliding-buffer 1))]
-      (go-loop []
-               (let [d (<! q)
-                     timer (timeout ms)]
-                 (f (loop [d d]
-                      (let [[val c'] (alts! [q timer])]
-                        (if (= c' timer)
-                d
-                (recur val)))))
-                 (recur)))
-      (fn [x] (put! q x))))
-
-

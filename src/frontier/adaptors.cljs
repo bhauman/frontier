@@ -18,11 +18,34 @@
   (:require-macros
       [cljs.core.async.macros :refer [go-loop]]))
 
+;; would really like to try different composition strategies using om
+;; 1. having one event-channel for all (pass it down a side channel)
+;; 2. independant event-channels
+;; 3. using the cursor path to determine the sent message path
+;; 4. mimic the om api frontier/build, frontier/root etc
+
+;; an local react state based om-component or should we pass
+;; { :cursor <> :local-state <> } for transformation
+
+;; it would be interesting to have a history manager om component wrap
+;; another om-component as an example of nested composition
+
+;; there strange relationship between display hierarchy and control
+;; heirarchy hence pedestals notion of app-state and display state
+;; which may be the way to go, something like frontier/controller 'vs
+;; frontier/build
+
+;; don't forget about mirroring frontier control structures on the
+;; server with an immutable db of messages ala lambda-architecture
+
+
 (defn scoped-cursor-state [cursor]
   (get-in @(om/-state cursor) (om/-path cursor)))
 
-
+;; we can parameterize the how and which state to work on cursor vs.
+;; local state
 (defn om-adaptor [fr-comp]
+  "this doesn't work on the react local state right now"
   (fn [cursor owner]
     (reify
       om/IInitState
@@ -58,14 +81,14 @@
       om/IWillUnmount
       (will-unmount [_]
         (print "unmount called")
+        (-stop fr-comp)        
         (close! (om/get-state owner :event-chan))
-        (close! (om/get-state owner :effect-chan))
-        (-stop fr-comp))
+        (close! (om/get-state owner :effect-chan)))
       om/IRenderState
       (render-state [_ {:keys [event-chan]}]
         #_(print "rendering" (-derive fr-comp (scoped-cursor-state cursor)))
         ;; does is speed rendering to use the cursor?
-        (sab/html         (-render fr-comp { :state (-derive fr-comp cursor) 
-                                            :event-chan event-chan }))
-))))
-
+        (sab/html
+         (-render fr-comp { :state (-derive fr-comp cursor) 
+                            :event-chan event-chan
+                            :om-cursor cursor }))))))
