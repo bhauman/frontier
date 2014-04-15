@@ -183,10 +183,10 @@
 
 (defn main-template [data]
   [:div
-   [:div.navbar.navbar-default.navbar-inverse.navbar-static-top
+   [:div.navbar.navbar-default.navbar-static-top.devards-main-navbar
     [:div.container
      [:div.navbar-header
-      [:a.navbar-brand "Devcards"]]]]
+      [:a.navbar-brand "(:devcards ClojureScript)"]]]]
    [:div.container
     [:div.row
      [:div.col-md-9
@@ -224,11 +224,16 @@
               identity)
              card-nodes))))
 
+(defn toggle-background-to-white [data]
+  (if (:display-single-card data)
+    (.addClass (js/$ "body") "white-background")
+    (.removeClass (js/$ "body") "white-background")))
+
 (defn create-needed-card-nodes [data]
   (when (:render-cards data)
-    #_(print "rendering cards")
     (.html ($ "#devcards-cards") (c/html (cards-templates data)))
-    ;; otherwise leave the nodes as they are))
+    ;; otherwise leave the nodes as they are
+    ))
 
 (defn unmount-card-nodes [data]
   (doseq [[card node] (:visible-card-nodes data)]
@@ -251,6 +256,7 @@
   (unmount-card-nodes state)
   (.html ($ "#devcards-controls") (c/html (main-template state)))
   (create-needed-card-nodes state)
+  (toggle-background-to-white state)
   (mount-card-nodes state))
 
 (def devcard-initial-data { :current-path []
@@ -303,3 +309,4 @@
              (when-let [v (<! tq)]
                (f v) (recur)))
     (fn [x] (put! q x))))
+

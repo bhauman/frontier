@@ -28,7 +28,8 @@
    [reactor.core :refer [render-to] :as rct]
    [devcards.util.edn-renderer :refer [html-edn]]   
    [cljs.core.async :refer [chan close! <!]]
-   [om.core :as om :include-macros true])
+   [om.core :as om :include-macros true]
+   [examples.sparse])
   (:require-macros
    [cljs.core.async.macros :refer [go-loop]]
    [devcards.cards :refer [is are= are-not=]]
@@ -207,6 +208,7 @@
    [:examples.core :edn-card-ex]
    (.getElementById js/document "main-area"))
 
+
 #_(defrecord NsTester []
   iInputFilter
   (-filter-input [_ [msg-name data] state]
@@ -300,3 +302,4 @@
   (.log js/console d))
 
 (log "funneer for me you know it is")
+

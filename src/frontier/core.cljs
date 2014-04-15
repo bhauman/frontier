@@ -302,8 +302,9 @@
         effect-chan (or effect-chan (chan))]
     (dev-null
      (map< (fn [msg]
-           (let [new-msg (-filter-input component msg @state-atom)]
-             (swap! state-atom (partial message-transform r) new-msg)))
+             #_(print msg)
+             (let [new-msg (-filter-input component msg @state-atom)]
+               (swap! state-atom (partial message-transform r) new-msg)))
            event-chan))
     (assoc r
       :effect-chan effect-chan

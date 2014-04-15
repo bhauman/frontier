@@ -161,7 +161,7 @@
   iRenderable
   (-render [_ {:keys [state event-chan] :as hist-state}]
     (let [derived-state (:render-stater state)]
-      [:div
+      [:div.history-manager
        (render-history-controls state event-chan)
        (-render virtual-system
                 { :state derived-state
@@ -172,7 +172,8 @@
 
 (defn render-history-controls [{:keys [under-control can-go-back can-go-forward msg messages] :as sys} hist-chan]
   (sab/html
-   [:div.navbar.navbar-default
+   [:div.navbar.navbar-default.navbar-static-top
+    {:style (js-obj "paddingLeft" "14px")}
     [:div.nav.navbar-nav.btn-group
      (if can-go-back
        [:a.btn.btn-default.navbar-btn
@@ -257,10 +258,10 @@
                    (when-let [react-dom (-render component state)]
                      (render-to (sab/html react-dom) node identity))))]
         (if (and (nil? (:state-atom @data))
-                 initial-inputs)
+                 (and initial-inputs (pos? (count initial-inputs))))
           (doseq [msg initial-inputs]
             (put! (:event-chan sys) msg))
-          (put! (:event-chan sys) [:history.render-no-op]))
+          (put! (:event-chan sys) [:__system.noop]))
         (reset! data sys)))
     (unmount [_ {:keys [node data]}]
       (when (:running @data)
@@ -288,5 +289,4 @@
 ;; maybe components should have a IGetInitialState protocol?
 ;; I am going to end up with the whole react / om protocol by
 ;; derivation??
-
 

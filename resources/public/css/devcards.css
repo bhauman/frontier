@@ -1,3 +1,24 @@
+body {
+    background-color: rgb(233,234,237);
+}
+
+.white-background {
+  background-color: #fff;
+}
+
+.devards-main-navbar {
+  background-color: rgb(60,90,153);
+  border-color: rgb(50,80,153);
+}
+
+.devards-main-navbar .navbar-brand {
+  color: #e8e8e8;
+}
+
+.devards-main-navbar .navbar-brand:hover {
+  color: #e8e8e8;
+}
+
 .test-body {
     padding-left: 1em;
 }
@@ -15,9 +36,26 @@
 }
 
 .devcard-panel {
-    border: none;
+/*    border: none;
     -webkit-box-shadow: none;
     box-shadow: none;
+
+    border: 1px solid #ddd;
+    -webkit-box-shadow: 1px 1px 1px #bbb;
+    box-shadow: 1px 1px 1px #bbb;
+*/
+background: #fff;
+border: 1px solid;
+border-color: #e5e6e9 #dfe0e4 #d0d1d5;
+-webkit-border-radius: 3px;
+}
+
+.breadcrumb {
+    background: #fff;
+    border: 1px solid;
+    border-color: #e5e6e9 #dfe0e4 #d0d1d5;
+    -webkit-border-radius: 3px;
+    
 }
 
 .devcard-panel > .panel-heading {
@@ -39,5 +77,37 @@
 
 .list-group.test-group .list-group-item {
   
-  
+}
+
+.devcard-padding {
+  padding-left: 14px;
+  padding-right: 14px;
+  padding-bottom: 14px;
+}
+
+#devcards {
+    padding-bottom: 250px;
+    
+}
+
+.devcard-rendered-card ul.test-group {
+  margin-bottom: 0px;
+}
+
+.devcard-rendered-card .heckler-card .table {
+  margin-bottom: 0px;
+}
+
+.table > tbody > tr > td.devcards-first-cell,
+.table > tbody > tr > th.devcards-first-cell {
+  padding-left: 14px;
+}
+
+.devcard-rendered-card .history-manager > .rendered-edn {
+  padding-left: 14px; 
+  padding-bottom: 14px; 
+}
+
+.devcards-pad-card {
+  padding: 14px;
 }
