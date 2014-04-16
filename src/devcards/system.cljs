@@ -294,10 +294,10 @@
              (let [d (<! in)
                    timer (timeout ms)]
                (put! out
-                     (loop [d d]
+                     (loop [d' d]
                        (let [[val tc] (alts! [in timer])]
                          (if (= tc timer)
-                           d
+                           d'
                            (recur val)))))
                (recur)))
     out))

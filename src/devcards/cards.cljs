@@ -7,8 +7,7 @@
    [devcards.util.edn-renderer :refer [html-edn]]
    [frontier.core :as fr]
    [frontier.cards :as fc]
-   [cljs.core.async :as async])
-)
+   [cljs.core.async :as async]))
 
 (defn react-card [react-component]
   (reify IMountable
@@ -131,8 +130,7 @@
                                    (mapv vector (range (count arg-seqs))
                                          (repeat 0)))}
                (fr/make-renderable
-                (fr/compose (SliderCard. (fn [& args] {:r (apply + args)})
-                                         arg-seqs))
+                (fr/compose (SliderCard. f arg-seqs))
                 (make-slider-renderer (or value-render-func html-edn)))
                []))
 
@@ -170,19 +168,18 @@
 (defn heckle-renderer [f data generator value-render-func test-func]
   (let [derived-data (heckle-derive @data f test-func)]
     [:div.heckler-card
-     [:div
-      {:style (js-obj "paddingLeft" "14px")}
+     [:div.devcards-pad-left
       [:a.btn.btn-danger.navbar-btn
        {:type "button"
         :onClick (fn [] (swap! data assoc-in [:gen-arg-list]
                               (heckle-values generator)))}
        "Re-heckle!"]
-      [:a.btn.btn-default.navbar-btn
-       {:style (js-obj "marginLeft" "14px")
+      [:a.btn.btn-default.navbar-btn.devcards-margin-left
+       {
         :className (if (:only-errors @data) "active" "")
         :onClick (fn [] (swap! data update-in [:only-errors] (fn [x] (not x)))) }
        "Toggle Errors"]
-      [:span {:style (js-obj "paddingLeft" "14px")}
+      [:span.devcards-pad-left
        (if (pos? (count (filter :error derived-data)))
          [:span.label.label-danger
           (count (filter :error derived-data))
@@ -197,14 +194,14 @@
            [:span]))]]
      [:table.table.table-striped.table-hover 
       [:tr
-       [:th.devcards-first-cell "Called"]
+       [:th "Called"]
        [:th "Result"]]
       (map
        (fn [{:keys [args error res-val] :as res}]
          (let []
            [:tr
             {:className (str (:class res))}
-            [:td.devcards-first-cell
+            [:td
              [:span.text-muted "(f "]
              (interpose [:span.text-muted ", "]
                         (map

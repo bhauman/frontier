@@ -50,10 +50,12 @@
          [:div
           ((input-controls-renderer [[:inc]
                                      [:dec]
-                                     [:deccererted]
+                                     [:deccerert]
                                      [:create-todo {:content "do something"}]])
            rstate)
           #_(html-edn state)])))
+
+
 
 (defcard managed-ex
   (managed-history-card { :strange {:money { } }}
