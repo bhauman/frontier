@@ -17,3 +17,6 @@ pom.xml.asc
 .nrepl-port
 /resources/public/js/compiled
 /resources/starter-site
+.lein-classpath
+.cljsbuild-mtimes
+

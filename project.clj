@@ -12,15 +12,18 @@
                  [jayq "2.4.0"]
                  [org.clojars.franks42/cljs-uuid-utils "0.1.3"]                 
                  [om "0.5.3"]
-                 [com.cemerick/double-check "0.5.7-SNAPSHOT"]
-
+                 #_[com.cemerick/double-check "0.5.7-SNAPSHOT"]
+                 [cljschangeserver "0.0.1"]
+                 
+                 ;; devserver
+                 [fs "1.1.2"]
                  [ring "1.2.1"] 
                  [http-kit "2.1.16"]
                  [compojure "1.1.6"]
                  [watchtower "0.1.1"]
                  [digest "1.4.3"]]
 
-  :plugins [[lein-cljsbuild "1.0.3"]]
+  :plugins [[lein-cljsbuild "1.0.3"] [devserver "0.1.0-SNAPSHOT"]]
 
   :source-paths ["src" "src/reactor" "src/frontier" "src/devcards" ]
 
@@ -31,6 +34,6 @@
                                    :output-dir "resources/public/js/compiled/out"
                                    :externs ["resources/public/js/externs/jquery-1.9.js"]
                                    :optimizations :none
-                                   :source-map true
-                                   :libs [""]}}]}
+                                   :source-map true}}]}
   :main devserver.core)
+

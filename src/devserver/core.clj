@@ -5,73 +5,70 @@
    [compojure.core :refer [defroutes GET POST DELETE ANY context routes]]
    [org.httpkit.server :refer [run-server with-channel on-close on-receive send! open?]]
    #_[clojure-watch.core :refer [start-watch]]
-   [watchtower.core :refer [watcher rate ignore-dotfiles file-filter extensions on-change]]
+   [watchtower.core :as wt :refer [watcher compile-watcher watcher* rate ignore-dotfiles file-filter extensions on-change]]
    [clojure.core.async :refer [go-loop <!! chan put! sliding-buffer timeout map< mult tap close!
                                ]]
    [clojure.string :as string]
    [digest :as digest]
-   [clojure.java.io :refer [as-file]]))
+   [clojure.java.io :refer [as-file]]
+   [fs.core :as fs]))
 
-(def file-md5-cache (atom {}))
-
-(defn file-contents-changed? [filename]
+(defn file-contents-changed? [{:keys [file-md5-cache] :as st} filename]
   (let [check-sum (digest/md5 (as-file filename))]
-    (when (not= (@file-md5-cache filename) check-sum)
-      (swap! file-md5-cache assoc filename check-sum)
+    (when (not= (@file-md5-cache
+                 filename) check-sum)
+      (swap! file-md5-cache
+             assoc filename
+             check-sum)
       true)))
 
-(def logger-chan (chan (sliding-buffer 100)))
-(defn log [& args] (put! logger-chan args))
+(defn log [{:keys [logger-chan]} & args]
+  (put! logger-chan args))
 
-(defn prnt []
+(defn print-logs [{:keys [logger-chan]}]
   (go-loop []
            (when-let [m (<! logger-chan)]
              (println (prn-str m))
              (recur))))
 
-;; yes i'm doing this :)
-(defonce file-change-atom (atom (list)))
+(defn setup-file-change-sender [{:keys [file-change-atom compile-wait-time] :as server-state}
+                                wschannel]
+  (add-watch file-change-atom
+             :message-watch
+             (fn [_ _ o n]
+               (let [msg (first n)]
+                 (log server-state "sending message")
+                 (log server-state msg)
+                 (when msg
+                   (<!! (timeout @compile-wait-time))
+                   (when (and (file-contents-changed? server-state (:local-path msg))
+                              (open? wschannel))
+                     (send! wschannel (prn-str msg)))))))
+  
+  ;; Keep alive!!
+  (go-loop []
+           (<! (timeout 5000))
+           (when (open? wschannel)
+             (send! wschannel (prn-str {:msg-name :ping}))
+             (recur))))
 
-(defonce compile-wait-time* (atom 500))
-
-(defn set-wait-time! [ms]
-  (reset! compile-wait-time* ms))
-
-(defn setup-file-change-sender [wschannel]
-  (let []
-    (add-watch file-change-atom :message-watch
-               (fn [_ _ o n]
-                 (let [msg (first n)]
-                   (log "sending message")
-                   (log msg)
-                   (when msg
-                     (<!! (timeout @compile-wait-time*))
-                     (when (and (file-contents-changed? (:local-path msg))
-                                (open? wschannel))
-                       (send! wschannel (prn-str msg))))
-                   )))
-    (go-loop []
-             (<! (timeout 5000))
-             (when (open? wschannel)
-               (send! wschannel (prn-str {:msg-name :ping}))
-               (recur)
-               ))))
-
-(defn reload-handler [request]
-  (with-channel request channel
-    (setup-file-change-sender channel)
-    (on-close channel (fn [status]
-                        (log "channel closed: " status)))))
+(defn reload-handler [server-state]
+  (fn [request]
+    (with-channel request channel
+      (setup-file-change-sender server-state channel)
+      (on-close channel (fn [status]
+                          (log server-state "channel closed: " status))))))
 
 (defroutes new-routes
   (GET "/new-route-test" [] (fn [request] {:status 200
                                           :headers {"Content-Type" "text/html"}
                                           :body "Hello World"})))
 
-(defn server [& {:keys [ring-handler]}]
+(defn server [{:keys [ring-handler] :as server-state}]
   (run-server
-   (routes (GET "/ws" [] reload-handler)
-           (if ring-handler ring-handler (fn [r])))
+   (if ring-handler
+     (routes (GET "/ws" [] (reload-handler server-state)) ring-handler)
+     (routes (GET "/ws" [] (reload-handler server-state))))
    {:port 8080}))
 
 #_(defn -main [& args]
@@ -87,18 +84,20 @@
 (defn append-msg [q msg]
   (conj (take 30 q) msg))
 
-(defn send-changed-file [filename]
-  (log filename)
-  (log "putting file on channel")
-  (swap! file-change-atom append-msg
+(defn send-changed-file [{:keys [file-change-atom] :as st} filename]
+  (log st filename)
+  (log st "putting file on channel")
+  (swap! file-change-atom
+         append-msg
          {:msg-name :file-changed
           :type :javascript
           :local-path filename
-          :file (server-relative-path filename 3)}))
+          ;; this assumes /resources/public
+          :file (server-relative-path filename 3)})) 
 
-(defn send-changed-files [files]
-  (when (> 10 (count files))
-    (mapv send-changed-file (mapv #(.getPath %) files))))
+(defn send-changed-files [server-state files]
+  (mapv (partial send-changed-file server-state)
+        (mapv #(.getPath %) files)))
 
 (defn starts-with? [s prefix]
   (when s (zero? (.indexOf s prefix))))
@@ -112,27 +111,47 @@
   (fn [file]
     (not ((require-prefixes prefix) file))))
 
-(defn file-watcher [] (watcher ["./resources/public/js/compiled"]
-                           (rate 500) ;; poll every 500ms
-                           (file-filter ignore-dotfiles) ;; add filter
-                           (file-filter (extensions :js)) ;; filter by extensions
-                           (file-filter (ignore-prefix "./resources/public/js/compiled/out/goog/"))
-                           (file-filter (ignore-prefix "./resources/public/js/compiled/out/clojure/"))
-                           (file-filter (ignore-prefix "./resources/public/js/compiled/out/cljs/"))
-                           #_(file-filter (require-prefixes "./resources/public/js/compiled/out/devcards/"
-                                                          "./resources/public/js/compiled/out/frontier/"
-                                                          "./resources/public/js/compiled/out/examples/"
-                                                        ))
+(defn compile-js-filewatcher [{:keys [js-dirs] :as state}]
+  (compile-watcher (-> js-dirs
+                       (watcher*)
+                       (file-filter ignore-dotfiles) ;; add filter
+                       (file-filter (extensions :js)) ;; filter by
+                       ;; this is too specific
+                       (file-filter (ignore-prefix "./resources/public/js/compiled/out/goog/"))
+                       (file-filter (ignore-prefix "./resources/public/js/compiled/out/clojure/"))
+                       (file-filter (ignore-prefix "./resources/public/js/compiled/out/cljs/"))
+                       (on-change (partial send-changed-files state)))))
 
-                           #_(file-filter file-contents-changed)
-                           (on-change send-changed-files)))
+(defn check-for-changes [{:keys [last-pass js-dirs] :as state}]
+  (binding [wt/*last-pass* last-pass]
+    (let [{:keys [updated? changed]} (compile-js-filewatcher state)]
+      (when-let [changes (updated?)]
+        (println (prn-str changes))
+        (changed changes)))))
 
-(defn start-server [ring-handler]
-  { :http-server (server :ring-handler ring-handler)
-    :file-change-watcher (file-watcher)})
+#_(check-for-changes ["./resources/public/js/compiled"] last-pass)
 
-(defn start-static-server []
-  (start-server (route/resources "/")))
+(defn file-watcher [state] (watcher ["./.cljsbuild-mtimes"]
+                               (rate 500) ;; poll every 500ms
+                               (on-change (fn [_] (check-for-changes state)))))
+
+(defn create-initial-state [{:keys [js-dirs ring-handler]}]
+  { :js-dirs js-dirs
+    :ring-handler ring-handler 
+    :last-pass (atom (System/currentTimeMillis))
+    :file-md5-cache (atom {})
+    :compile-wait-time (atom 10)
+    :file-change-atom (atom (list))
+    :logger-chan (chan (sliding-buffer 100))})
+
+(defn start-server [{:keys [js-dirs ring-handler] :as opts}]
+  (let [state (create-initial-state opts)]
+    (merge { :http-server (server state)
+             :file-change-watcher (file-watcher state)}
+           state)))
+
+(defn start-static-server [{:keys [js-dirs] :as opts}]
+  (start-server (merge opts {:ring-handler (route/resources "/")})))
 
 (defn stop-server [{:keys [http-server file-change-watcher] :as server-data}]
   (http-server)

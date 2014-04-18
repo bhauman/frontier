@@ -6,9 +6,8 @@
    [sablono.core :include-macros true :as sab]
    [frontier.core :as fr]
    [frontier.cards :as fc]
-   [cemerick.double-check.generators :as gen]   
+   #_[cemerick.double-check.generators :as gen]   
    [cljs.core.async :refer [put! sliding-buffer chan] :as async]))
-
 
 (dcc/defcard reduce-slider-trans
   (devc/reduce-fr-card
@@ -24,7 +23,8 @@
                          1 4
                          1 5]))
 
-(dcc/defcard slider-card-dev
+
+#_(dcc/defcard slider-card-dev
   (devc/slider-card (fn [& args] (apply + args))
                     [(gen/sample gen/string 200)
                      (gen/sample gen/string 200)
@@ -36,7 +36,8 @@
     (throw (js/Error. "Crappers Error Thrown"))
     (+ a b)))
 
-(dcc/defcard heckler-ex
+
+#_(dcc/defcard heckler-ex
   (devc/heckler-card to-heckle-f #(gen/sample (gen/tuple (gen/tuple gen/int)
                                                          gen/int) 100)
                 :test-func (fn [x] (< (count x) 100))))
@@ -75,7 +76,6 @@
     :tz -15)
   )
 
-
 (defn left-side [d]
   (assoc d
     :y (+ 90 (:y d))
@@ -112,12 +112,7 @@
                                :top "0px"}
                               (css-transform
                                {  :ry 90
-                                  :tz 50})))}]
-
-
-
-
-   
+                                  :tz 50 })))}]
    
    [:div.side {:style (clj->js
                        (merge {:backgroundColor "green"
@@ -128,8 +123,7 @@
                               (css-transform
                                {  :ry 270
                                   :tz 50})))}]   
-   ]
-  )
+   ])
 
 (dcc/defcard threed-fun
   (devc/slider-card
@@ -147,20 +141,15 @@
                       "height" "100px")}
       (cube {:css (merge
                    { :width "100%"
-                     :height "100%"}
+                    :height "100%"}
                    (css-transform {:rx x
-                                  :ry y
-                                  :rz z}))})
+                                   :ry y
+                                   :rz z}))})
       #_(square (assoc (left-side d)
-                :color "red"))
+                  :color "red"))
       #_(square (assoc (front-side d)
-                :color "blue"))
+                  :color "blue"))
       
       #_(html-edn d)]
-     ))
-  )
-
-
-
-
+     )))
 
