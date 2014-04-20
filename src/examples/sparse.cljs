@@ -9,6 +9,8 @@
    #_[cemerick.double-check.generators :as gen]   
    [cljs.core.async :refer [put! sliding-buffer chan] :as async]))
 
+
+
 (dcc/defcard reduce-slider-trans
   (devc/reduce-fr-card
    (devc/SliderCard. 1 1)
@@ -23,13 +25,11 @@
                          1 4
                          1 5]))
 
-
 #_(dcc/defcard slider-card-dev
   (devc/slider-card (fn [& args] (apply + args))
                     [(gen/sample gen/string 200)
                      (gen/sample gen/string 200)
                      (gen/sample gen/string 200)]))
-
 
 (defn to-heckle-f [a b]
   (if (or (= b 333) (= b 3333))
@@ -94,7 +94,9 @@
                                :postition "absolute" }
                               (css-transform
                                { :ry 0
-                                 :tz 50})))}]
+                                :tz 50})))}]
+
+   
    [:div.side {:style (clj->js
                        (merge {:backgroundColor "red"
                                :width "100px"
@@ -125,6 +127,7 @@
                                   :tz 50})))}]   
    ])
 
+
 (dcc/defcard threed-fun
   (devc/slider-card
    (fn [x y z]
@@ -152,4 +155,3 @@
       
       #_(html-edn d)]
      )))
-

@@ -10,6 +10,7 @@
        (def ~vname (fn [] ~expr))
        (devcards.core/register-card  [~(keyword ns) ~(keyword vname)] [] ~vname))))
 
+
 (defmacro hidecard
   [vname expr]
   (let [ns (-> &env :ns :name name munge)]

@@ -10,7 +10,7 @@
                             mount-card-nodes
                             unique-card-id
                             throttle-function]]
-   [devserver.reloader :refer [watch-and-reload]]   
+   [cljs-livereload.core :refer [watch-and-reload]]
    [cljs.core.async :refer [put! chan]])
   (:require-macros
    [devcards.macros :refer [defonce]]))
@@ -25,6 +25,7 @@
       (register-listeners "#devcards" devcard-event-chan)
       ds)))
 
+
 (defn start-single-card-ui! []
   (defonce devcard-system
     (devcard-system-start devcard-event-chan
@@ -36,12 +37,9 @@
 
 (defn start-file-reloader! []
   (defonce reloading-socket
-    (do
-      (.on (js/$ "body") "devserverJsReload"
-           (fn [e]
-             #_(.log js/console "reload callback happening")
-             (put! devcard-event-chan [:jsreload])))
-      (watch-and-reload :retry-count 50))))
+    (watch-and-reload :retry-count 50
+                      :jsload-callback (fn [x]
+                                         (put! devcard-event-chan [:jsreload])))))
 
 (defn register-card [path tags func]
   (put! devcard-event-chan
@@ -51,3 +49,4 @@
   (let [id (unique-card-id card-path)]
     (when-not (.getElementById js/document id)
       (.html (js/$ node) (str "<div class='devcard-rendered-card' id='" id "'></div>")))))
+

@@ -13,7 +13,7 @@
                  [org.clojars.franks42/cljs-uuid-utils "0.1.3"]                 
                  [om "0.5.3"]
                  #_[com.cemerick/double-check "0.5.7-SNAPSHOT"]
-                 [cljschangeserver "0.0.1"]
+                 [cljs-livereload "0.1.0-SNAPSHOT"]
                  
                  ;; devserver
                  [fs "1.1.2"]
@@ -23,7 +23,7 @@
                  [watchtower "0.1.1"]
                  [digest "1.4.3"]]
 
-  :plugins [[lein-cljsbuild "1.0.3"] [devserver "0.1.0-SNAPSHOT"]]
+  :plugins [[lein-cljsbuild "1.0.3"] [lein-cljs-livereload "0.1.0-SNAPSHOT"]]
 
   :source-paths ["src" "src/reactor" "src/frontier" "src/devcards" ]
 
@@ -35,5 +35,10 @@
                                    :externs ["resources/public/js/externs/jquery-1.9.js"]
                                    :optimizations :none
                                    :source-map true}}]}
+  
+  :cljs-livereload { :js-dirs ["resources/public/js/compiled/examples.js" "resources/public/js/compiled/out"]
+                     :http-server-root "public" ;; assumes "resources"
+                     :server-port 8080 }
+
   :main devserver.core)
 
