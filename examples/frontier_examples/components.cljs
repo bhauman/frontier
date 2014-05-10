@@ -1,11 +1,11 @@
-(ns frontier.example.components
+(ns frontier-examples.components
   (:require
-   [frontier.core :refer [iInputFilter
-                                 iPluginInit
-                                 iTransform
-                                 iEffect
-                                 iDerive
-                                 add-effects]]
+   [frontier.core :refer [IInputFilter
+                          IInit
+                          ITransform
+                          IEffect
+                          IDerive
+                          add-effects]]
    [cljs.core.async :as async :refer [put!]]   
    [jayq.util :refer [log]]))
 
@@ -22,25 +22,28 @@
          (dec (:count system))))
 
 (defrecord ExampleCounter []
-  iInputFilter
+  IInputFilter
   (-filter-input [_ [name data] system]
     [name data])
-  iPluginInit
+  IInit
   (-initialize [o system event-chan]
-    (log "initializing counter"))
-  iTransform
+    #_(log "initializing counter"))
+  ITransform
   (-transform [o msg system]
     (count-trans (first msg) system (last msg)))
-  iDerive
+  IDerive
   (-derive [o system]
     (if (:count system)
-      (assoc system :double (* 2 (:count system)))
+      (assoc system
+        :double (* 2 (:count system))
+        :triple (* 3 (:count system)))
       system))
-  iEffect
+  IEffect
   (-effect [o msg system event-chan effect-chan]
-    (log "affecting")
+    #_(log "affecting")
     )
   )
+
 
 (defmulti todo-trans identity)
 
@@ -67,22 +70,22 @@
 
 (defmethod todo-eff :store-changes [_ system data event-chan]
   (put! event-chan [:inc {}])
-  (log "storing changes"))
+  #_(log "storing changes"))
 
 (defrecord ExampleTodos []
-  iInputFilter
+  IInputFilter
   (-filter-input [_ [name data] system]
     (if (= name :create-todo)
       [name (assoc data :id (rand-int 10000000))]
       [name data]))
-  iPluginInit
+  IInit
   (-initialize [o system event-chan]
-    (log "initializing todos"))
-  iTransform
+    #_(log "initializing todos"))
+  ITransform
   (-transform [o msg system]
     (todo-trans (first msg) system (last msg)))
-  iEffect
+  IEffect
   (-effect [o [name data] system event-chan effect-chan]
     (todo-eff name system data event-chan)
-    (log "affecting 2")
+    #_(log "affecting 2")
     ))

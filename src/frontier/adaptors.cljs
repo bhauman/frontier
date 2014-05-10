@@ -1,7 +1,7 @@
 (ns frontier.adaptors
   (:require
    [frontier.core :refer [compose make-renderable
-                          iTransform iRenderable -transform -render -derive
+                          -transform -render -derive
                           -filter-input
                           -initialize
                           -stop
@@ -38,12 +38,12 @@
 ;; don't forget about mirroring frontier control structures on the
 ;; server with an immutable db of messages ala lambda-architecture
 
-
 (defn scoped-cursor-state [cursor]
   (get-in @(om/-state cursor) (om/-path cursor)))
 
 ;; we can parameterize the how and which state to work on cursor vs.
-;; local state
+;; local state (local state could come in and leave as meta data?)
+
 (defn om-adaptor [fr-comp]
   "this doesn't work on the react local state right now"
   (fn [cursor owner]
@@ -54,7 +54,7 @@
           :effect-chan (chan) })
       om/IWillMount
       (will-mount [_]
-        (print "MOUNT called")        
+        #_(print "MOUNT called")        
         (let [event-chan  (om/get-state owner :event-chan)
               effect-chan (om/get-state owner :effect-chan)]
           (go-loop []
@@ -80,7 +80,7 @@
                        event-chan)))
       om/IWillUnmount
       (will-unmount [_]
-        (print "unmount called")
+        #_(print "unmount called")
         (-stop fr-comp)        
         (close! (om/get-state owner :event-chan))
         (close! (om/get-state owner :effect-chan)))
@@ -92,3 +92,4 @@
          (-render fr-comp { :state (-derive fr-comp cursor) 
                             :event-chan event-chan
                             :om-cursor cursor }))))))
+

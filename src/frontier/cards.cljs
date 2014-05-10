@@ -3,17 +3,16 @@
    [cljs.core.async :as async
     :refer [put!]]
    [clojure.string :as string]
-   [reactor.core :refer [render-to raw]]
    [sablono.core :as sab :include-macros true]
    [devcards.util.edn-renderer :refer [html-edn]]
    [devcards.system :refer [IMountable]]
-   [frontier.core :refer [iInputFilter
-                          iPluginInit
-                          iTransform
-                          iEffect
-                          iDerive
-                          iRenderable
-                          iPluginStop
+   [frontier.core :refer [IInputFilter
+                          IInit
+                          ITransform
+                          IEffect
+                          IDerive
+                          IRender
+                          IStop
                           HistoryKeeper
                           Namespacer
                           -stop
@@ -26,8 +25,7 @@
                           runner-stop
                           run-with-atom
                           msg-prefix
-                          msg->local-msg]]
-   [jayq.util :refer [log]]))
+                          msg->local-msg]]))
 
 (defn can-go-forward? [{:keys [pointer __history-keeper]}]
   (< pointer (count (:history __history-keeper))))
@@ -130,26 +128,26 @@
            (= "history"))))
 
 (defrecord HistoryManager [virtual-system]
-  iPluginInit
+  IInit
   (-initialize [_ state event-chan]
     (-initialize virtual-system state event-chan))
-  iPluginStop
+  IStop
   (-stop [_]
     (-stop virtual-system))
-  iInputFilter
+  IInputFilter
   (-filter-input [_ msg state]
     (-filter-input virtual-system msg state))
-  iTransform
+  ITransform
   (-transform [o msg state]
     (if (history-message? msg)
       (hist-trans msg state (:__history-keeper state))
       (let [new-state (-transform virtual-system msg state)]
         (assoc new-state :pointer
          (count (get-in new-state [:__history-keeper :history]))))))
-  iEffect
+  IEffect
   (-effect [o msg state event-chan effect-chan]
     (-effect virtual-system msg state event-chan effect-chan))
-  iDerive
+  IDerive
   (-derive [o state]
     (-> state
         under-control
@@ -158,7 +156,7 @@
         add-msg
         messages
         (render-state virtual-system)))
-  iRenderable
+  IRender
   (-render [_ {:keys [state event-chan] :as hist-state}]
     (let [derived-state (:render-stater state)]
       [:div.history-manager
@@ -256,7 +254,7 @@
                  component
                  (fn [state]
                    (when-let [react-dom (-render component state)]
-                     (render-to (sab/html react-dom) node identity))))]
+                     (.renderComponent js/React (sab/html react-dom) node identity))))]
         (if (and (nil? (:state-atom @data))
                  (and initial-inputs (pos? (count initial-inputs))))
           (doseq [msg initial-inputs]
@@ -289,4 +287,3 @@
 ;; maybe components should have a IGetInitialState protocol?
 ;; I am going to end up with the whole react / om protocol by
 ;; derivation??
-

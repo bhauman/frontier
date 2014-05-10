@@ -1,7 +1,6 @@
 (ns frontier.core
   (:require
    [sablono.core :as sab :include-macros true]
-   [reactor.core :as rct]
    [cljs.core.async :as async
     :refer [chan put! map< close! map>]]
    [devcards.util.edn-renderer :refer [html-edn]])
@@ -13,29 +12,29 @@
 (defn- dev-null [in]
   (go-loop [] (if (nil? (<! in)) :closed (recur))))
 
-(defprotocol iPluginInit
+(defprotocol IInit
   (-initialize [_ effect-chan event-chan]))
 
-(defprotocol iPluginStop
+(defprotocol IStop
   (-stop [_]))
 
-(defprotocol iTransform
+(defprotocol ITransform
   (-transform [_ msg state]))
 
-(defprotocol iEffect
+(defprotocol IEffect
   (-effect [_ msg state event-chan effect-chan]))
 
-(defprotocol iInputFilter
+(defprotocol IInputFilter
   (-filter-input [_ msg state]))
 
-(defprotocol iDerive
+(defprotocol IDerive
   (-derive [_ state]))
 
-(defprotocol iRenderable
+(defprotocol IRender
   (-render [_ state]))
 
 ;; only using this for namespacing right now
-(defprotocol iWillAccept
+(defprotocol IWillAccept
   (-will-accept? [o msg]))
 
 (defn add-effects [state & args]
@@ -45,12 +44,12 @@
 
 ;; need to add will accept
 (defn compose [& components]
-  (let [initializers    (filter #(satisfies? iPluginInit %) components)
-        stoppers        (filter #(satisfies? iPluginStop %) components)
-        transforms      (filter #(satisfies? iTransform %) components)
-        effects         (filter #(satisfies? iEffect %) components)
-        input-filters   (filter #(satisfies? iInputFilter %) components)
-        derivatives     (filter #(satisfies? iDerive %) components)
+  (let [initializers    (filter #(satisfies? IInit %) components)
+        stoppers        (filter #(satisfies? IStop %) components)
+        transforms      (filter #(satisfies? ITransform %) components)
+        effects         (filter #(satisfies? IEffect %) components)
+        input-filters   (filter #(satisfies? IInputFilter %) components)
+        derivatives     (filter #(satisfies? IDerive %) components)
         ifilter (apply comp (mapv
                              (fn [pl]
                                (let [func (partial -filter-input pl)]
@@ -73,30 +72,30 @@
     (reify
       ICloneable
       (-clone [o] o)      
-      iPluginInit
+      IInit
       (-initialize [_ state event-chan]
         (doseq [pl initializers]
           (-initialize pl state event-chan)))
-      iPluginStop
+      IStop
       (-stop [_]
         (doseq [pl stoppers]
           (-stop pl)))      
-      iTransform
+      ITransform
       (-transform [_ msg state]
         (last (itrans [msg state])))
-      iEffect
+      IEffect
       (-effect [_ msg state event-chan effect-chan]
         (ieffects msg state event-chan effect-chan))
-      iInputFilter
+      IInputFilter
       (-filter-input [_ msg state]
         (first (ifilter [msg state])))
-      iDerive
+      IDerive
       (-derive [_ state]
         (ideriv state)))))
 
 (defn make-renderable [component render-function]
   (specify component
-    iRenderable
+    IRender
     (-render [_ state]
       (render-function state))))
 
@@ -190,25 +189,25 @@
 ;; it's the best way to do this
 ;; cursors are very interesting
 (defrecord Namespacer [path system]
-  iWillAccept
+  IWillAccept
   (-will-accept? [_ [msg-name _]]
     (msg-path->local-msg-name path msg-name))
-  iPluginInit
+  IInit
   (-initialize [o state event-chan]
     (-initialize system state event-chan))
-  iPluginStop
+  IStop
   (-stop [_]
     (-stop system))
-  iInputFilter
+  IInputFilter
   (-filter-input [_ msg state]
     (ns-input-filter path msg
                      (fn [msg]
                        (-filter-input system msg state))))  
-  iTransform
+  ITransform
   (-transform [o msg state]
     (ns-transform (path->box path) 
                   msg state system))
-  iEffect
+  IEffect
   (-effect [o msg state event-chan effect-chan]
     (when-let [local-msg (msg->local-msg path msg)]
       (let [local-event-chan (ns-scoped-channel (path->box path)
@@ -218,12 +217,12 @@
         (-effect system local-msg (get-in state
                                           (path->box path))
                  local-event-chan local-effect-chan))))
-  iDerive
+  IDerive
   (-derive [o state]
     (update-in state (path->box path)
                (fn [st]
                  (-derive system st))))
-  iRenderable
+  IRender
   (-render [_ rstate]
     (-render system
              { :state (get-in (:state rstate) (path->box path))
@@ -238,31 +237,31 @@
     :initial-state initial-state)) ;; not needed here
 
 (defrecord HistoryKeeper [system initial-state]
-  iPluginInit
+  IInit
   (-initialize [o state event-chan]
     (-initialize system state event-chan))
-  iPluginStop
+  IStop
   (-stop [_]
     (-stop system))
-  iInputFilter
+  IInputFilter
   (-filter-input [_ msg state]
     (-filter-input system msg state))  
-  iTransform
+  ITransform
   (-transform [o msg state]
     (if (= :set-history (first msg))
       (assoc-in state :history (second msg))
-      (if (satisfies? iWillAccept system)
+      (if (satisfies? IWillAccept system)
         (if (-will-accept? system msg)
           (history-keeper-transform o msg state)
           state)
         (history-keeper-transform o msg state))))
-  iEffect
+  IEffect
   (-effect [o msg state event-chan effect-chan]
     (-effect system msg state event-chan effect-chan))
-  iDerive
+  IDerive
   (-derive [o state]
     (-derive system state))
-  iRenderable
+  IRender
   (-render [_ rstate]
     (-render system rstate)))
 
@@ -323,7 +322,7 @@
                :state-callback (fn [_ _ o n]
                                  (state-callback
                                   { :state (-derive component n)
-                                    :event-chan event-chan }))))
+                                   :event-chan event-chan }))))
   r)
 
 (defn runner-start [runnable]
