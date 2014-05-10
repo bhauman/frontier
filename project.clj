@@ -19,7 +19,7 @@
   
   :cljsbuild {
               :builds [{:id "examples"
-                        :source-paths ["src/frontier" "examples/frontier_examples"]
+                        :source-paths ["src/frontier" "examples/frontier_examples" #_"checkouts/devcards/src"]
                         :compiler {:output-to "resources/public/js/compiled/examples.js"
                                    :output-dir "resources/public/js/compiled/out"
                                    :externs ["resources/public/js/externs/jquery-1.9.js"]
