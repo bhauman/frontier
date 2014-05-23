@@ -1,6 +1,6 @@
 (ns frontier-examples.devcards
   (:require
-   [devcards.core :refer [om-card]]
+   [devcards.core :refer [om-root-card]]
    [frontier.core :refer [compose make-renderable]]
    [frontier.adaptors :refer [om-adaptor]]
    [frontier.cards :as cards :refer [system-card
@@ -31,8 +31,8 @@
                         (todo-counter-app)
                         [[:inc] [:inc]]))
 
-(defcard omcard-frontier-ex2
-    (om-card (om-adaptor (history-manager {:hello 5} (todo-counter-app))) {:hello 5}))
+#_(defcard omcard-frontier-ex2
+    (om-root-card (om-adaptor (history-manager {:hello 5} (todo-counter-app))) {:hello 5}))
 
-(defcard omcard-frontier-ex
-    (om-card (om-adaptor (todo-counter-app)) {:hello 5}))
+#_(defcard omcard-frontier-ex
+    (om-root-card (om-adaptor (todo-counter-app)) {:hello 5}))

@@ -5,7 +5,6 @@
    [clojure.string :as string]
    [sablono.core :as sab :include-macros true]
    [devcards.util.edn-renderer :refer [html-edn]]
-   [devcards.system :refer [IMountable]]
    [frontier.core :refer [IInputFilter
                           IInit
                           ITransform
@@ -244,28 +243,6 @@
      input-messages
      event-chan)))
 
-(defn system-card [initial-state component initial-inputs]
-  (reify
-    IMountable
-    (mount [_ {:keys [node data]}]
-      (let [sys (run-with-atom
-                 (or (:state-atom @data) (atom nil)) 
-                 initial-state
-                 component
-                 (fn [state]
-                   (when-let [react-dom (-render component state)]
-                     (.renderComponent js/React (sab/html react-dom) node identity))))]
-        (if (and (nil? (:state-atom @data))
-                 (and initial-inputs (pos? (count initial-inputs))))
-          (doseq [msg initial-inputs]
-            (put! (:event-chan sys) msg))
-          (put! (:event-chan sys) [:__system.noop]))
-        (reset! data sys)))
-    (unmount [_ {:keys [node data]}]
-      (when (:running @data)
-        (reset! data (runner-stop @data)))
-      (.unmountComponentAtNode js/React node))))
-
 (defn history-manager [initial-state component]
   (let [initial-state' (assoc-in {} [:__history-keeper :state] initial-state)]
     (HistoryManager.
@@ -274,14 +251,6 @@
       (HistoryKeeper.
        (Namespacer. :state component)
        (:__history-keeper initial-state'))))))
-
-(defn managed-history-card [initial-state component initial-inputs]
-  (let [inputs (mapv (partial msg-prefix [:__history-keeper :state]) initial-inputs)
-        initial-state' (assoc-in {} [:__history-keeper :state] initial-state)]
-    (system-card initial-state'
-                 (history-manager initial-state
-                                  component)
-                 inputs)))
 
 ;; the handling of initial state is super wonky
 ;; maybe components should have a IGetInitialState protocol?
