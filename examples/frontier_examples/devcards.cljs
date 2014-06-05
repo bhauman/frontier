@@ -1,6 +1,6 @@
 (ns frontier-examples.devcards
   (:require
-   [devcards.core :refer [om-root-card]]
+   [devcards.core :as dc]
    [frontier.core :refer [compose make-renderable]]
    [frontier.adaptors :refer [om-adaptor]]
    [frontier.cards :as cards :refer [system-card
@@ -27,7 +27,7 @@
                                  [:create-todo {:content "buy an F1 racer"}]])))
 
 (defcard managed-ex
-  (managed-history-card { }
+  (dc/managed-history-card { }
                         (todo-counter-app)
                         [[:inc] [:inc]]))
 
